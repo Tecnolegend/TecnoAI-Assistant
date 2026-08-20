@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Glowing Outer Halo Orbit -->
+    <path
+        android:pathData="M54,28 A26,26 0 1 0 54,80 A26,26 0 1 0 54,28 Z"
+        android:strokeWidth="3.5"
+        android:strokeLineCap="round">
+        <aapt:attr name="android:strokeColor">
+            <gradient
+                android:startX="28"
+                android:startY="28"
+                android:endX="80"
+                android:endY="80"
+                android:type="linear">
+                <item android:color="#FFFF2D55" android:offset="0.0" />
+                <item android:color="#FFE50914" android:offset="0.5" />
+                <item android:color="#FF8A0010" android:offset="1.0" />
+            </gradient>
+        </aapt:attr>
+    </path>
+    <!-- Central AI Pulse / Tecno T Node -->
+    <path
+        android:pathData="M38,40 L70,40 L70,47 L58,47 L58,70 L50,70 L50,47 L38,47 Z"
+        android:fillType="nonZero">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:startX="38"
+                android:startY="40"
+                android:endX="70"
+                android:endY="70"
+                android:type="linear">
+                <item android:color="#FFFFFFFF" android:offset="0.0" />
+                <item android:color="#FFFF8080" android:offset="0.4" />
+                <item android:color="#FFFF2A3A" android:offset="1.0" />
+            </gradient>
+        </aapt:attr>
+    </path>
+    <!-- Sparkle/Energy Accent -->
+    <path
+        android:pathData="M72,32 L74,38 L80,40 L74,42 L72,48 L70,42 L64,40 L70,38 Z"
+        android:fillColor="#FFFF4D67" />
+    <path
+        android:pathData="M36,66 L37.5,70 L41.5,71.5 L37.5,73 L36,77 L34.5,73 L30.5,71.5 L34.5,70 Z"
+        android:fillColor="#FFFF8099" />
+</vector>

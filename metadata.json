@@ -1,0 +1,6 @@
+{
+  "name": "Tecno AI",
+  "description": "Native Android AI Action Assistant featuring Hey Tecno wake phrase, fast local device tools, and Gemini intelligence.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

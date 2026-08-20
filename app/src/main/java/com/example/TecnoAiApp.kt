@@ -1,0 +1,42 @@
+package com.example
+
+import android.app.Application
+import android.app.NotificationChannel
+import android.app.NotificationManager
+import android.content.Context
+import android.os.Build
+import com.example.data.local.TecnoDatabase
+import com.example.data.local.UserSettingsManager
+import com.example.data.repository.AssistantRepository
+
+class TecnoAiApp : Application() {
+
+    val database: TecnoDatabase by lazy { TecnoDatabase.getDatabase(this) }
+    val userSettingsManager: UserSettingsManager by lazy { UserSettingsManager(this) }
+    val repository: AssistantRepository by lazy {
+        AssistantRepository(database.conversationDao(), userSettingsManager, this)
+    }
+
+    override fun onCreate() {
+        super.onCreate()
+        createNotificationChannels()
+    }
+
+    private fun createNotificationChannels() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val channel = NotificationChannel(
+                WAKE_WORD_CHANNEL_ID,
+                "Tecno AI Wake Word Service",
+                NotificationManager.IMPORTANCE_LOW
+            ).apply {
+                description = "Active background listening for Hey Tecno wake phrase"
+            }
+            val manager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            manager.createNotificationChannel(channel)
+        }
+    }
+
+    companion object {
+        const val WAKE_WORD_CHANNEL_ID = "tecno_wake_word_channel"
+    }
+}
