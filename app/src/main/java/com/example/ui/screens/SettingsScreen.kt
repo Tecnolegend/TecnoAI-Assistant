@@ -25,10 +25,12 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.Key
 import androidx.compose.material.icons.filled.Layers
 import androidx.compose.material.icons.filled.Mic
+import androidx.compose.material.icons.filled.PhoneAndroid
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Psychology
 import androidx.compose.material.icons.filled.Security
@@ -78,7 +80,16 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.ai.GeminiNetworkClient
+import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.BugReport
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.PhoneAndroid
+import com.example.diagnostics.BugTracker
+import com.example.diagnostics.DiagnosticLog
+import com.example.diagnostics.LogLevel
+import com.example.ui.components.UpdateNewsDialog
 import com.example.speech.SoundCueHelper
 import com.example.speech.VoicePresets
 import com.example.tools.ToolRegistry
@@ -95,6 +106,7 @@ import com.example.ui.theme.SuccessGreen
 import com.example.ui.theme.TextMuted
 import com.example.ui.theme.TextPrimary
 import com.example.ui.theme.TextSecondary
+import com.example.ui.theme.WarningAmber
 import com.example.ui.viewmodel.AssistantViewModel
 import com.google.firebase.auth.FirebaseAuth
 import kotlinx.coroutines.launch
@@ -110,8 +122,20 @@ fun SettingsScreen(
     val context = LocalContext.current
     val settings by viewModel.userSettings.collectAsState()
     val voiceProfile by viewModel.voiceProfile.collectAsState()
+    val networkState by viewModel.networkState.collectAsState()
+    val lastLatencyMs by viewModel.lastExecutionLatencyMs.collectAsState()
+    val isOfflineEngineHandled by viewModel.isOfflineEngineHandled.collectAsState()
     val authUser = rememberUserAuth()
     val coroutineScope = rememberCoroutineScope()
+    var showUpdateNews by remember { mutableStateOf(false) }
+    val bugLogs by BugTracker.logs.collectAsState()
+
+    if (showUpdateNews) {
+        UpdateNewsDialog(
+            onDismiss = { showUpdateNews = false },
+            onExplorePowers = { showUpdateNews = false }
+        )
+    }
 
     val models = listOf(
         "gemini-2.5-flash" to "Tecno Neural Flash 2.5 (Fast & Responsive - Recommended)",
@@ -193,51 +217,463 @@ fun SettingsScreen(
                             color = TextSecondary,
                             lineHeight = 16.sp
                         )
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Button(
+                            onClick = { showUpdateNews = true },
+                            colors = ButtonDefaults.buttonColors(containerColor = CrimsonBright),
+                            shape = RoundedCornerShape(10.dp),
+                            modifier = Modifier.fillMaxWidth().testTag("whats_new_2_0_button")
+                        ) {
+                            Icon(Icons.Default.AutoAwesome, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("What's New in Update 2.0 (Release Notes)", fontSize = 12.5.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                        }
                     }
                 }
             }
 
-            // 5-KEY FAILOVER POOL SECTION
+            // DEFAULT ASSISTANT SETTING
             item {
-                SettingsSectionHeader(title = "TECNO AI 5-KEY FAILOVER POOL")
+                SettingsSectionHeader(title = "DEFAULT DIGITAL ASSISTANT INTEGRATION")
             }
 
             item {
+                val isDefaultAssistant = remember {
+                    try {
+                        val defaultAssist = Settings.Secure.getString(context.contentResolver, "assistant") ?: ""
+                        val defaultVoice = Settings.Secure.getString(context.contentResolver, "voice_interaction_service") ?: ""
+                        defaultAssist.contains(context.packageName) || defaultVoice.contains(context.packageName)
+                    } catch (e: Exception) {
+                        false
+                    }
+                }
+
                 SettingsCard {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(modifier = Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
+                            Box(
+                                modifier = Modifier
+                                    .size(36.dp)
+                                    .clip(CircleShape)
+                                    .background(if (isDefaultAssistant) SuccessGreen.copy(alpha = 0.2f) else CrimsonSubtle),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    Icons.Default.AutoAwesome,
+                                    contentDescription = null,
+                                    tint = if (isDefaultAssistant) SuccessGreen else CrimsonBright,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Column {
+                                Text("System Default Assistant", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
+                                Text(
+                                    text = if (isDefaultAssistant) "Tecno AI is active as system assistant" else "Not set as default assistant",
+                                    fontSize = 11.5.sp,
+                                    color = if (isDefaultAssistant) SuccessGreen else TextSecondary
+                                )
+                            }
+                        }
+
+                        Surface(
+                            shape = RoundedCornerShape(6.dp),
+                            color = if (isDefaultAssistant) SuccessGreen.copy(alpha = 0.15f) else DarkSurfaceVariant
+                        ) {
+                            Text(
+                                text = if (isDefaultAssistant) "● Default" else "Not Set",
+                                fontSize = 10.sp,
+                                color = if (isDefaultAssistant) SuccessGreen else TextMuted,
+                                fontWeight = FontWeight.SemiBold,
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(10.dp))
+
                     Text(
-                        text = "5-Key Automatic Failover System",
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = TextPrimary
-                    )
-                    Text(
-                        text = "Configure up to 5 API keys. If one key reaches rate limits or encounters an error, Tecno AI instantly switches to the next available key without interruption.",
-                        fontSize = 11.sp,
+                        text = "Set Tecno AI as your default digital assistant to invoke via long-pressing Home, corner swipe gestures, or device power button.",
+                        fontSize = 11.5.sp,
                         color = TextMuted,
                         lineHeight = 15.sp
                     )
 
                     Spacer(modifier = Modifier.height(12.dp))
 
-                    val keys = listOf(
-                        Triple(1, "Primary Key (Slot 1)", settings.apiKey1),
-                        Triple(2, "Backup Key 1 (Slot 2)", settings.apiKey2),
-                        Triple(3, "Backup Key 2 (Slot 3)", settings.apiKey3),
-                        Triple(4, "Backup Key 3 (Slot 4)", settings.apiKey4),
-                        Triple(5, "Backup Key 5 (Slot 5)", settings.apiKey5)
+                    Button(
+                        onClick = {
+                            val intent = Intent(Settings.ACTION_VOICE_INPUT_SETTINGS).apply {
+                                flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                            }
+                            try {
+                                context.startActivity(intent)
+                            } catch (e: Exception) {
+                                val altIntent = Intent(Settings.ACTION_MANAGE_DEFAULT_APPS_SETTINGS).apply {
+                                    flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                                }
+                                context.startActivity(altIntent)
+                            }
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = if (isDefaultAssistant) DarkSurfaceVariant else CrimsonBright),
+                        shape = RoundedCornerShape(10.dp),
+                        modifier = Modifier.fillMaxWidth().testTag("set_default_assistant_button")
+                    ) {
+                        Icon(Icons.Default.PhoneAndroid, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = if (isDefaultAssistant) "Manage Default Assistant Settings" else "Set Tecno AI as Default Assistant",
+                            fontSize = 12.5.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White
+                        )
+                    }
+                }
+            }
+
+            // OFFLINE PROCESSING LAYER SECTION
+            item {
+                SettingsSectionHeader(title = "OFFLINE PROCESSING LAYER & SPEED")
+            }
+
+            item {
+                SettingsCard {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(modifier = Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
+                            Box(
+                                modifier = Modifier
+                                    .size(38.dp)
+                                    .clip(CircleShape)
+                                    .background(Color(0xFF00F5D4).copy(alpha = 0.15f)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text("⚡", fontSize = 18.sp)
+                            }
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Column {
+                                Text("Local-First Offline Engine", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
+                                Text(
+                                    text = if (networkState.isOnline) "Active (Sub-5ms Execution)" else "⚡ Offline Mode Active",
+                                    fontSize = 11.5.sp,
+                                    color = if (networkState.isOnline) Color(0xFF00F5D4) else WarningAmber,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                            }
+                        }
+
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = if (networkState.isOnline) SuccessGreen.copy(alpha = 0.15f) else WarningAmber.copy(alpha = 0.15f)
+                        ) {
+                            Text(
+                                text = if (networkState.simulatedOffline) "Simulated Offline" else if (networkState.isOnline) "● Online" else "● Offline",
+                                fontSize = 10.sp,
+                                color = if (networkState.isOnline) SuccessGreen else WarningAmber,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    Text(
+                        text = "Allows critical commands like 'open settings', 'stop music', flashlight, and app launching to execute instantly on-device with zero delay, even when internet is unstable or disconnected.",
+                        fontSize = 11.5.sp,
+                        color = TextMuted,
+                        lineHeight = 15.sp
                     )
 
-                    keys.forEach { (index, label, currentKey) ->
-                        ApiKeySlotInput(
-                            index = index,
-                            label = label,
-                            savedKey = currentKey,
-                            onSaveKey = { newKey ->
-                                viewModel.updateApiKey(index, newKey)
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    // Test Offline Mode Switch
+                    SettingsSwitchRow(
+                        title = "Simulate Offline Mode (For Testing)",
+                        subtitle = "Disconnect the assistant from network to verify instant offline execution for settings, media, and hardware actions.",
+                        icon = Icons.Default.CloudOff,
+                        checked = networkState.simulatedOffline,
+                        onCheckedChange = { viewModel.toggleSimulatedOffline(it) },
+                        tag = "toggle_simulate_offline"
+                    )
+
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    // Capabilities list chip
+                    Text(
+                        text = "SUPPORTED OFFLINE POWERS",
+                        fontSize = 10.5.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = TextMuted,
+                        letterSpacing = 1.sp
+                    )
+                    Spacer(modifier = Modifier.height(6.dp))
+
+                    listOf(
+                        "⚙️ Open Settings, Wi-Fi, Bluetooth, Display, Apps",
+                        "🎵 Media Controls (Stop Music, Play, Next/Previous)",
+                        "🔦 Hardware (Flashlight, Volume, Battery, Wi-Fi)",
+                        "🚀 Launch Apps (YouTube, Camera, Chrome, Spotify)",
+                        "⏰ Alarms & Timers (Set Timer, Set Alarm)",
+                        "📱 Direct Calls & SMS Messaging Prep",
+                        "🧮 Sub-millisecond Offline Math Calculation"
+                    ).forEach { cap ->
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.padding(vertical = 2.dp)
+                        ) {
+                            Text(
+                                text = cap,
+                                fontSize = 11.sp,
+                                color = TextSecondary
+                            )
+                        }
+                    }
+                }
+            }
+
+            // NEURAL ENGINES & API CONFIGURATION CATEGORY
+            item {
+                SettingsSectionHeader(title = "NEURAL ENGINES & API CONFIGURATION")
+            }
+
+            item {
+                var showCustomApiOverrides by remember { mutableStateOf(false) }
+                val relationships by viewModel.userRelationships.collectAsState()
+                val preferences by viewModel.userPreferences.collectAsState()
+
+                SettingsCard {
+                    // Category A: Built-in Dual Engine
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.Security, contentDescription = null, tint = SuccessGreen, modifier = Modifier.size(20.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = "Built-in Dual API Engines",
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = TextPrimary
+                            )
+                        }
+                        Surface(
+                            shape = RoundedCornerShape(10.dp),
+                            color = SuccessGreen.copy(alpha = 0.15f)
+                        ) {
+                            Text(
+                                text = "ACTIVE & HIDDEN",
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = SuccessGreen,
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(6.dp))
+
+                    Text(
+                        text = "Tecno AI is pre-configured with 2 high-speed neural APIs built-in and secured behind the scenes. Zero manual setup is required for full intelligence and voice features.",
+                        fontSize = 11.sp,
+                        color = TextMuted,
+                        lineHeight = 15.sp
+                    )
+
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    Surface(
+                        shape = RoundedCornerShape(12.dp),
+                        color = DarkSurfaceElevated,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(modifier = Modifier.padding(10.dp)) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text("Primary Neural Engine:", fontSize = 11.sp, color = TextSecondary)
+                                Text("•••••••••••••••• (Built-in)", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = SuccessGreen)
                             }
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text("Failover Neural Engine:", fontSize = 11.sp, color = TextSecondary)
+                                Text("•••••••••••••••• (Built-in)", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = SuccessGreen)
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    // Category B: Custom API Overrides Accordion
+                    OutlinedButton(
+                        onClick = { showCustomApiOverrides = !showCustomApiOverrides },
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Icon(Icons.Default.Tune, contentDescription = null, tint = CrimsonBright, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = if (showCustomApiOverrides) "Hide Custom API Overrides" else "Advanced: Custom API Key Slots (Optional)",
+                            fontSize = 12.sp,
+                            color = CrimsonBright
                         )
-                        if (index < 5) {
-                            Spacer(modifier = Modifier.height(8.dp))
+                    }
+
+                    if (showCustomApiOverrides) {
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Text(
+                            text = "Add optional personal API keys to prioritize ahead of the built-in dual engines:",
+                            fontSize = 11.sp,
+                            color = TextMuted
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+
+                        val keys = listOf(
+                            Triple(1, "Custom Slot 1 (Primary Override)", settings.apiKey1),
+                            Triple(2, "Custom Slot 2 (Secondary Override)", settings.apiKey2),
+                            Triple(3, "Custom Slot 3 (Tertiary Override)", settings.apiKey3),
+                            Triple(4, "Custom Slot 4 (Failover 1)", settings.apiKey4),
+                            Triple(5, "Custom Slot 5 (Failover 2)", settings.apiKey5)
+                        )
+
+                        keys.forEach { (index, label, currentKey) ->
+                            ApiKeySlotInput(
+                                index = index,
+                                label = label,
+                                savedKey = currentKey,
+                                onSaveKey = { newKey ->
+                                    viewModel.updateApiKey(index, newKey)
+                                }
+                            )
+                            if (index < 5) {
+                                Spacer(modifier = Modifier.height(8.dp))
+                            }
+                        }
+                    }
+                }
+            }
+
+            // PERSONALIZATION & USER RELATIONSHIPS CATEGORY
+            item {
+                SettingsSectionHeader(title = "PERSONALIZATION & LEARNED MEMORY")
+            }
+
+            item {
+                val relationships by viewModel.userRelationships.collectAsState()
+                val preferences by viewModel.userPreferences.collectAsState()
+
+                SettingsCard {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.Psychology, contentDescription = null, tint = CrimsonBright, modifier = Modifier.size(20.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "Learned Relationships & Preferences",
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = TextPrimary
+                        )
+                    }
+
+                    Text(
+                        text = "Say things like \"My father is John\" or \"My favorite music is EDM\" and Tecno AI automatically remembers and adapts to your life.",
+                        fontSize = 11.sp,
+                        color = TextMuted,
+                        lineHeight = 15.sp,
+                        modifier = Modifier.padding(top = 4.dp, bottom = 10.dp)
+                    )
+
+                    if (relationships.isNotEmpty()) {
+                        Text("Known Family & Contacts:", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = CrimsonBright)
+                        Spacer(modifier = Modifier.height(6.dp))
+                        relationships.forEach { rel ->
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 3.dp)
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(DarkSurfaceElevated)
+                                    .padding(horizontal = 10.dp, vertical = 6.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column {
+                                    Text(
+                                        text = "${rel.relationKey.replaceFirstChar { it.uppercase() }}: ${rel.displayName}",
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = TextPrimary
+                                    )
+                                    if (rel.phoneNumber != null) {
+                                        Text("Phone: ${rel.phoneNumber} (${rel.appPreference ?: "whatsapp"})", fontSize = 10.sp, color = TextMuted)
+                                    }
+                                }
+                                IconButton(
+                                    onClick = { viewModel.deleteRelationship(rel.id) },
+                                    modifier = Modifier.size(24.dp)
+                                ) {
+                                    Icon(Icons.Default.Delete, contentDescription = "Forget", tint = WarningAmber, modifier = Modifier.size(14.dp))
+                                }
+                            }
+                        }
+                        Spacer(modifier = Modifier.height(10.dp))
+                    }
+
+                    if (preferences.isNotEmpty()) {
+                        Text("Personal Preferences:", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = CrimsonBright)
+                        Spacer(modifier = Modifier.height(6.dp))
+                        preferences.forEach { pref ->
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 3.dp)
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(DarkSurfaceElevated)
+                                    .padding(horizontal = 10.dp, vertical = 6.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = "${pref.prefKey.replace('_', ' ').replaceFirstChar { it.uppercase() }}: ${pref.prefValue}",
+                                    fontSize = 12.sp,
+                                    color = TextPrimary
+                                )
+                                IconButton(
+                                    onClick = { viewModel.deletePreference(pref.prefKey) },
+                                    modifier = Modifier.size(24.dp)
+                                ) {
+                                    Icon(Icons.Default.Delete, contentDescription = "Forget", tint = WarningAmber, modifier = Modifier.size(14.dp))
+                                }
+                            }
+                        }
+                    }
+
+                    if (relationships.isEmpty() && preferences.isEmpty()) {
+                        Surface(
+                            shape = RoundedCornerShape(10.dp),
+                            color = DarkSurfaceElevated,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(
+                                text = "No personal memories recorded yet. Start telling Tecno AI about your family or favorites in the chat!",
+                                fontSize = 11.sp,
+                                color = TextSecondary,
+                                modifier = Modifier.padding(10.dp)
+                            )
                         }
                     }
                 }
@@ -835,6 +1271,89 @@ fun SettingsScreen(
                     DiagnosticRow("Tecno AI Neural Engine", "Active (5-Key Failover Enabled)")
                     Spacer(modifier = Modifier.height(8.dp))
                     DiagnosticRow("Wake Word Service", if (settings.isWakeWordEnabled) "Background Listening Active" else "Disabled")
+                }
+            }
+
+            // LIVE BUG TRACKER & TELEMETRY
+            item {
+                SettingsSectionHeader(title = "LIVE BUG TRACKING & SYSTEM TELEMETRY")
+            }
+
+            item {
+                SettingsCard {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.BugReport, contentDescription = null, tint = CrimsonBright, modifier = Modifier.size(20.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Real-Time Event & Bug Log", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
+                        }
+
+                        IconButton(
+                            onClick = { BugTracker.clearLogs() },
+                            modifier = Modifier.size(28.dp).testTag("clear_bug_logs_button")
+                        ) {
+                            Icon(Icons.Default.Delete, contentDescription = "Clear logs", tint = TextMuted, modifier = Modifier.size(16.dp))
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    if (bugLogs.isEmpty()) {
+                        Text("No errors or warnings recorded. System is running cleanly.", fontSize = 12.sp, color = SuccessGreen)
+                    } else {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(DarkSurface, RoundedCornerShape(10.dp))
+                                .padding(10.dp),
+                            verticalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            bugLogs.takeLast(6).reversed().forEach { log ->
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    verticalAlignment = Alignment.Top
+                                ) {
+                                    val badgeColor = when (log.level) {
+                                        LogLevel.ERROR -> CrimsonBright
+                                        LogLevel.WARN -> WarningAmber
+                                        LogLevel.SUCCESS -> SuccessGreen
+                                        LogLevel.INFO -> TextMuted
+                                    }
+                                    val textColor = when (log.level) {
+                                        LogLevel.ERROR -> CrimsonBright
+                                        LogLevel.WARN -> WarningAmber
+                                        LogLevel.SUCCESS -> SuccessGreen
+                                        LogLevel.INFO -> TextSecondary
+                                    }
+
+                                    Surface(
+                                        shape = RoundedCornerShape(4.dp),
+                                        color = badgeColor.copy(alpha = 0.15f)
+                                    ) {
+                                        Text(
+                                            text = log.level.name,
+                                            fontSize = 9.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = badgeColor,
+                                            modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
+                                        )
+                                    }
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text(
+                                        text = "[${log.timestamp}] ${log.tag}: ${log.message}",
+                                        fontSize = 11.sp,
+                                        color = textColor,
+                                        lineHeight = 14.sp,
+                                        modifier = Modifier.weight(1f)
+                                    )
+                                }
+                            }
+                        }
+                    }
                 }
             }
 

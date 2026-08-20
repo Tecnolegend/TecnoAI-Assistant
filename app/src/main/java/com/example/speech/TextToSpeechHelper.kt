@@ -22,76 +22,85 @@ data class AssistantVoiceProfile(
 object VoicePresets {
     val allVoices = listOf(
         AssistantVoiceProfile(
-            id = "tecno_crimson",
-            name = "Tecno Crimson (Male)",
-            description = "Deep, resonant masculine baritone with authoritative presence",
-            pitch = 0.80f,
-            speechRate = 1.00f,
+            id = "alex_friend",
+            name = "Alex (Casual Best Friend)",
+            description = "Natural, warm, conversational male companion like your best friend",
+            pitch = 0.96f,
+            speechRate = 1.02f,
             gender = "Male",
-            voiceKeywords = listOf("male", "en-us-x-sod", "en-us-x-iom", "en-gb-x-rjs", "man")
+            voiceKeywords = listOf("en-us-x-sod", "en-us-x-iom", "male", "en-us-language")
         ),
         AssistantVoiceProfile(
-            id = "jarvis_titan",
-            name = "Jarvis Titan (Male)",
-            description = "Calm, ultra-crisp British executive masculine AI",
-            pitch = 0.72f,
-            speechRate = 0.96f,
-            gender = "Male",
-            voiceKeywords = listOf("en-gb", "male", "en-gb-x-rjs", "en-gb-x-fis")
-        ),
-        AssistantVoiceProfile(
-            id = "ares_executive",
-            name = "Ares Executive (Male)",
-            description = "Modern, confident, assertive male tech assistant",
-            pitch = 0.76f,
-            speechRate = 1.05f,
-            gender = "Male",
-            voiceKeywords = listOf("male", "en-us-x-iom", "en-us-x-sod")
-        ),
-        AssistantVoiceProfile(
-            id = "marcus_natural",
-            name = "Marcus Natural (Male)",
-            description = "Warm, melodic, friendly conversational male companion",
+            id = "liam_chill",
+            name = "Liam (Chill Companion)",
+            description = "Mellow, smooth, relaxed masculine friend with easygoing pacing",
             pitch = 0.88f,
-            speechRate = 1.00f,
+            speechRate = 0.95f,
             gender = "Male",
-            voiceKeywords = listOf("male", "en-us-x-sod", "en-au-x-aub")
+            voiceKeywords = listOf("en-us-x-iom", "en-gb-x-rjs", "male", "en-au-x-aub")
         ),
         AssistantVoiceProfile(
-            id = "cipher_tech",
-            name = "Cipher Tech (Male)",
-            description = "Fast, precise, sharp cyberpunk male delivery",
-            pitch = 0.84f,
-            speechRate = 1.25f,
+            id = "ethan_buddy",
+            name = "Ethan (Energetic Buddy)",
+            description = "Upbeat, expressive, enthusiastic male friend with lively cadence",
+            pitch = 1.06f,
+            speechRate = 1.10f,
             gender = "Male",
-            voiceKeywords = listOf("male", "en-us-x-iom")
+            voiceKeywords = listOf("en-us-x-sod", "male", "en-us")
         ),
         AssistantVoiceProfile(
-            id = "tecno_scarlet",
-            name = "Tecno Scarlet (Female)",
-            description = "Crisp, dynamic high-clarity radiant female voice",
-            pitch = 1.20f,
-            speechRate = 1.05f,
+            id = "david_baritone",
+            name = "David (Deep Baritone Friend)",
+            description = "Deep, grounded, confident and reassuring conversational brotherly tone",
+            pitch = 0.76f,
+            speechRate = 0.95f,
+            gender = "Male",
+            voiceKeywords = listOf("en-gb-x-rjs", "en-us-x-iom", "male", "baritone")
+        ),
+        AssistantVoiceProfile(
+            id = "leo_expressive",
+            name = "Leo (Sharp & Expressive)",
+            description = "Quick-witted, crisp, engaging tech-savvy friend",
+            pitch = 0.92f,
+            speechRate = 1.15f,
+            gender = "Male",
+            voiceKeywords = listOf("en-us-x-sod", "en-us-x-iom", "male")
+        ),
+        AssistantVoiceProfile(
+            id = "emma_friend",
+            name = "Emma (Warm Companion)",
+            description = "Gentle, natural, lively female best friend with expressive clarity",
+            pitch = 1.05f,
+            speechRate = 1.02f,
             gender = "Female",
-            voiceKeywords = listOf("female", "en-us-x-sfg", "en-us-x-iol", "woman")
+            voiceKeywords = listOf("en-us-x-sfg", "en-us-x-iol", "female", "woman")
         ),
         AssistantVoiceProfile(
-            id = "aura_velvet",
-            name = "Aura Velvet (Female)",
-            description = "Warm, melodic, expressive companion",
-            pitch = 1.12f,
+            id = "maya_empathetic",
+            name = "Maya (Calm & Empathetic)",
+            description = "Soothing, thoughtful, gentle female conversationalist",
+            pitch = 1.14f,
+            speechRate = 0.96f,
+            gender = "Female",
+            voiceKeywords = listOf("en-us-x-sfg", "female", "en-gb-x-fis")
+        ),
+        AssistantVoiceProfile(
+            id = "chloe_radiant",
+            name = "Chloe (Upbeat & Radiant)",
+            description = "Bright, bubbly, joyful conversational companion",
+            pitch = 1.22f,
+            speechRate = 1.08f,
+            gender = "Female",
+            voiceKeywords = listOf("en-us-x-iol", "female", "woman")
+        ),
+        AssistantVoiceProfile(
+            id = "sam_natural",
+            name = "Sam (Balanced Natural)",
+            description = "Neutral everyday human companion with natural modern intonation",
+            pitch = 1.00f,
             speechRate = 1.00f,
-            gender = "Female",
-            voiceKeywords = listOf("female", "en-us-x-sfg")
-        ),
-        AssistantVoiceProfile(
-            id = "cyber_neo",
-            name = "Cyber Neo (Neural)",
-            description = "Futuristic sci-fi balanced synthetic assistant",
-            pitch = 0.95f,
-            speechRate = 1.12f,
             gender = "Neutral",
-            voiceKeywords = listOf("neutral", "network")
+            voiceKeywords = listOf("neutral", "network", "en-us")
         )
     )
 

@@ -28,6 +28,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Accessibility
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Call
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Contacts
@@ -108,6 +109,14 @@ fun PermissionsCenterScreen(
 
     val specialPermissions = remember {
         listOf(
+            AdvancedPermissionItem(
+                title = "Default Digital Assistant App",
+                description = "Set Tecno AI as your system-wide default Android assistant for instant activation from power button, corner swipes, or navigation bar gestures.",
+                isSystemSpecial = true,
+                specialAction = Settings.ACTION_VOICE_INPUT_SETTINGS,
+                icon = Icons.Default.AutoAwesome,
+                isCritical = true
+            ),
             AdvancedPermissionItem(
                 title = "Display Over Other Apps (Overlay)",
                 description = "Allows the Tecno AI floating bubble and Siri/Gemini dynamic assistant screen to appear on top of other applications.",
@@ -215,11 +224,20 @@ fun PermissionsCenterScreen(
                 }
             }
 
-            // Special System Permissions (Overlay + Accessibility)
+            // Special System Permissions (Overlay + Accessibility + Default Assistant)
             items(specialPermissions) { item ->
                 val isGranted = when (item.title) {
                     "Display Over Other Apps (Overlay)" -> Settings.canDrawOverlays(context)
                     "Tecno In-App Accessibility Control" -> TecnoAccessibilityService.instance != null
+                    "Default Digital Assistant App" -> {
+                        try {
+                            val defaultAssist = Settings.Secure.getString(context.contentResolver, "assistant") ?: ""
+                            val defaultVoice = Settings.Secure.getString(context.contentResolver, "voice_interaction_service") ?: ""
+                            defaultAssist.contains(context.packageName) || defaultVoice.contains(context.packageName)
+                        } catch (e: Exception) {
+                            false
+                        }
+                    }
                     else -> false
                 }
 

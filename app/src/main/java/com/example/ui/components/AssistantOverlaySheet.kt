@@ -102,6 +102,9 @@ fun AssistantOverlaySheet(
     val pendingConfirmation by viewModel.pendingConfirmation.collectAsState()
     val audioLevel by viewModel.speechRecognizerHelper.rmsLevel.collectAsState()
     val isSpeaking by viewModel.textToSpeechHelper.isSpeaking.collectAsState()
+    val networkState by viewModel.networkState.collectAsState()
+    val lastLatencyMs by viewModel.lastExecutionLatencyMs.collectAsState()
+    val isOfflineEngineHandled by viewModel.isOfflineEngineHandled.collectAsState()
 
     var showTextInput by remember { mutableStateOf(false) }
     var textInput by remember { mutableStateOf("") }
@@ -159,28 +162,56 @@ fun AssistantOverlaySheet(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 // Header badge
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(16.dp))
-                        .background(Color.Black.copy(alpha = 0.6f))
-                        .border(1.dp, Color.White.copy(alpha = 0.15f), RoundedCornerShape(16.dp))
-                        .padding(horizontal = 12.dp, vertical = 6.dp)
-                ) {
-                    Box(
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier
-                            .size(8.dp)
-                            .clip(CircleShape)
-                            .background(if (uiState == AssistantUiState.LISTENING) CrimsonBright else Color(0xFF00F5D4))
-                    )
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text(
-                        text = "TECNO AI",
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Bold,
-                        letterSpacing = 1.4.sp,
-                        color = Color.White
-                    )
+                            .clip(RoundedCornerShape(16.dp))
+                            .background(Color.Black.copy(alpha = 0.6f))
+                            .border(1.dp, Color.White.copy(alpha = 0.15f), RoundedCornerShape(16.dp))
+                            .padding(horizontal = 12.dp, vertical = 6.dp)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(8.dp)
+                                .clip(CircleShape)
+                                .background(if (uiState == AssistantUiState.LISTENING) CrimsonBright else Color(0xFF00F5D4))
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = "TECNO AI",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            letterSpacing = 1.4.sp,
+                            color = Color.White
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.width(8.dp))
+
+                    // Offline / Latency badge
+                    Surface(
+                        shape = RoundedCornerShape(14.dp),
+                        color = if (isOfflineEngineHandled) Color(0xFF00F5D4).copy(alpha = 0.18f) else Color.White.copy(alpha = 0.08f),
+                        border = androidx.compose.foundation.BorderStroke(
+                            1.dp,
+                            if (isOfflineEngineHandled) Color(0xFF00F5D4).copy(alpha = 0.4f) else Color.White.copy(alpha = 0.12f)
+                        )
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                        ) {
+                            Text(
+                                text = if (!networkState.isOnline) "⚡ Offline Mode"
+                                else if (isOfflineEngineHandled && lastLatencyMs != null) "⚡ ${lastLatencyMs}ms Local"
+                                else "⚡ Offline Ready",
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = if (isOfflineEngineHandled) Color(0xFF00F5D4) else Color(0xFFE0E0E0)
+                            )
+                        }
+                    }
                 }
 
                 Row(verticalAlignment = Alignment.CenterVertically) {

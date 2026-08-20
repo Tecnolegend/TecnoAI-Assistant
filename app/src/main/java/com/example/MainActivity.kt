@@ -1,11 +1,16 @@
 package com.example
 
+import android.content.BroadcastReceiver
+import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
+import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
+import com.example.wakeword.WakeWordService
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -43,9 +48,25 @@ class MainActivity : ComponentActivity() {
 
     private val viewModel: AssistantViewModel by viewModels()
 
+    private val overlayBroadcastReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            if (intent?.action == WakeWordService.ACTION_OPEN_OVERLAY_BROADCAST) {
+                val query = intent.getStringExtra(com.example.overlay.AssistOverlayActivity.EXTRA_INITIAL_QUERY)
+                viewModel.handleWakeWordTrigger(query)
+            }
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+
+        val filter = IntentFilter(WakeWordService.ACTION_OPEN_OVERLAY_BROADCAST)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            registerReceiver(overlayBroadcastReceiver, filter, Context.RECEIVER_NOT_EXPORTED)
+        } else {
+            registerReceiver(overlayBroadcastReceiver, filter)
+        }
 
         handleIntent(intent)
 
@@ -56,16 +77,31 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    override fun onResume() {
+        super.onResume()
+        viewModel.ensureWakeWordServiceRunning()
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        try {
+            unregisterReceiver(overlayBroadcastReceiver)
+        } catch (e: Exception) {}
+    }
+
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
+        setIntent(intent)
         handleIntent(intent)
     }
 
     private fun handleIntent(intent: Intent?) {
         val initialQuery = intent?.getStringExtra("EXTRA_INITIAL_QUERY")
+            ?: intent?.getStringExtra(com.example.overlay.AssistOverlayActivity.EXTRA_INITIAL_QUERY)
         val isVoiceTrigger = intent?.getBooleanExtra("EXTRA_START_LISTENING", false) == true ||
                              intent?.getBooleanExtra("EXTRA_START_ASSISTANT_OVERLAY", false) == true ||
-                             intent?.action == Intent.ACTION_VOICE_COMMAND
+                             intent?.action == Intent.ACTION_VOICE_COMMAND ||
+                             intent?.action == Intent.ACTION_ASSIST
 
         if (!initialQuery.isNullOrBlank()) {
             viewModel.handleWakeWordTrigger(initialQuery)

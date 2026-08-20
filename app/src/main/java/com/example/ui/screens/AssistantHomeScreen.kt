@@ -77,6 +77,7 @@ import com.example.data.PrebuiltTasksRepository
 import com.example.data.TaskCategory
 import com.example.data.local.ConversationEntity
 import com.example.ui.components.RedOrbVisualizer
+import com.example.ui.components.UpdateNewsDialog
 import com.example.ui.theme.CrimsonBright
 import com.example.ui.theme.CrimsonDark
 import com.example.ui.theme.CrimsonGlow
@@ -112,9 +113,21 @@ fun AssistantHomeScreen(
     val history by viewModel.conversationHistory.collectAsState()
     val audioLevel by viewModel.audioVolumeMeterHelper.normalizedVolume.collectAsState()
     val voiceProfile by viewModel.voiceProfile.collectAsState()
+    val networkState by viewModel.networkState.collectAsState()
+    val lastLatencyMs by viewModel.lastExecutionLatencyMs.collectAsState()
+    val isOfflineEngineHandled by viewModel.isOfflineEngineHandled.collectAsState()
+    val personalizedSuggestions by viewModel.personalizedSuggestions.collectAsState()
 
     var taskSearchQuery by remember { mutableStateOf("") }
     var selectedCategory by remember { mutableStateOf(TaskCategory.ALL) }
+    var showUpdateNews by remember { mutableStateOf(false) }
+
+    if (showUpdateNews) {
+        UpdateNewsDialog(
+            onDismiss = { showUpdateNews = false },
+            onExplorePowers = { showUpdateNews = false }
+        )
+    }
 
     val filteredTasks = remember(taskSearchQuery, selectedCategory) {
         PrebuiltTasksRepository.searchTasks(taskSearchQuery, selectedCategory)
@@ -142,6 +155,9 @@ fun AssistantHomeScreen(
                     }
                 },
                 actions = {
+                    IconButton(onClick = { showUpdateNews = true }, modifier = Modifier.testTag("nav_update_news_button")) {
+                        Icon(Icons.Default.AutoAwesome, contentDescription = "What's New in Update 2.0", tint = CrimsonBright)
+                    }
                     IconButton(onClick = onNavigateToPermissions, modifier = Modifier.testTag("nav_permissions_button")) {
                         Icon(Icons.Default.Security, contentDescription = "Permissions", tint = TextSecondary)
                     }
@@ -350,6 +366,190 @@ fun AssistantHomeScreen(
                             tint = if (voiceProfile.isEnrolled) SuccessGreen else CrimsonBright,
                             modifier = Modifier.size(20.dp)
                         )
+                    }
+                }
+            }
+
+            // Offline Processing Engine & Speed Layer Card
+            item {
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = DarkSurfaceElevated),
+                    border = CardDefaults.outlinedCardBorder().copy(
+                        brush = Brush.horizontalGradient(
+                            listOf(Color(0xFF00F5D4).copy(alpha = 0.6f), CrimsonDark)
+                        )
+                    ),
+                    shape = RoundedCornerShape(18.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("offline_engine_status_card")
+                ) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(38.dp)
+                                        .clip(CircleShape)
+                                        .background(Color(0xFF00F5D4).copy(alpha = 0.15f)),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text("⚡", fontSize = 18.sp)
+                                }
+                                Spacer(modifier = Modifier.width(10.dp))
+                                Column {
+                                    Text(
+                                        "Offline Processing Engine",
+                                        fontSize = 14.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = TextPrimary
+                                    )
+                                    Text(
+                                        text = if (networkState.isOnline) "Active • Sub-5ms Local-First Execution" else "⚡ OFFLINE MODE ACTIVE • Critical Powers Ready",
+                                        fontSize = 11.sp,
+                                        color = if (networkState.isOnline) Color(0xFF00F5D4) else WarningAmber,
+                                        fontWeight = FontWeight.SemiBold
+                                    )
+                                }
+                            }
+
+                            if (lastLatencyMs != null) {
+                                Surface(
+                                    shape = RoundedCornerShape(12.dp),
+                                    color = if (isOfflineEngineHandled) Color(0xFF00F5D4).copy(alpha = 0.15f) else DarkSurfaceVariant,
+                                    border = androidx.compose.foundation.BorderStroke(
+                                        1.dp,
+                                        if (isOfflineEngineHandled) Color(0xFF00F5D4).copy(alpha = 0.4f) else DarkBorder
+                                    )
+                                ) {
+                                    Text(
+                                        text = if (isOfflineEngineHandled) "${lastLatencyMs}ms (Instant)" else "${lastLatencyMs}ms",
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = if (isOfflineEngineHandled) Color(0xFF00F5D4) else TextSecondary,
+                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                    )
+                                }
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(10.dp))
+
+                        Text(
+                            text = "Critical device controls run 100% on-device with zero network latency, ensuring instant response even when internet connection is unstable or offline.",
+                            fontSize = 11.5.sp,
+                            color = TextSecondary,
+                            lineHeight = 16.sp
+                        )
+
+                        Spacer(modifier = Modifier.height(10.dp))
+
+                        // Quick offline command triggers
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            listOf("Open Settings", "Stop Music", "Flashlight", "Volume 80%").forEach { cmd ->
+                                Surface(
+                                    onClick = {
+                                        viewModel.openAssistantOverlay(startVoice = false)
+                                        viewModel.submitPrompt(cmd)
+                                    },
+                                    shape = RoundedCornerShape(8.dp),
+                                    color = DarkSurface,
+                                    border = androidx.compose.foundation.BorderStroke(1.dp, DarkBorder),
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    Text(
+                                        text = cmd,
+                                        fontSize = 10.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = TextPrimary,
+                                        textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                                        maxLines = 1,
+                                        modifier = Modifier.padding(vertical = 6.dp, horizontal = 2.dp)
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Personalized Smart Suggestions Based on Activity & Learned Contacts
+            if (personalizedSuggestions.isNotEmpty()) {
+                item {
+                    Column(modifier = Modifier.fillMaxWidth()) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(Icons.Default.AutoAwesome, contentDescription = null, tint = CrimsonBright, modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(
+                                    text = "SUGGESTIONS FOR YOU",
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    letterSpacing = 1.2.sp,
+                                    color = CrimsonBright
+                                )
+                            }
+                            Text(
+                                text = "Learned Habits",
+                                fontSize = 11.sp,
+                                color = TextMuted
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.height(8.dp))
+
+                        LazyRow(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            contentPadding = PaddingValues(horizontal = 2.dp)
+                        ) {
+                            items(personalizedSuggestions) { suggestion ->
+                                Surface(
+                                    onClick = {
+                                        viewModel.openAssistantOverlay(startVoice = false)
+                                        viewModel.submitPrompt(suggestion.suggestedPrompt)
+                                    },
+                                    shape = RoundedCornerShape(14.dp),
+                                    color = DarkSurfaceElevated,
+                                    border = androidx.compose.foundation.BorderStroke(1.dp, DarkBorder),
+                                    modifier = Modifier.testTag("suggestion_chip_${suggestion.id}")
+                                ) {
+                                    Row(
+                                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text(
+                                            text = suggestion.icon,
+                                            fontSize = 16.sp,
+                                            modifier = Modifier.padding(end = 8.dp)
+                                        )
+                                        Column {
+                                            Text(
+                                                text = suggestion.title,
+                                                fontSize = 12.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = TextPrimary
+                                            )
+                                            Text(
+                                                text = suggestion.subtitle,
+                                                fontSize = 10.sp,
+                                                color = TextSecondary
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
             }

@@ -145,10 +145,10 @@ class FloatingOverlayService : Service() {
     }
 
     private fun openAssistantApp() {
-        val launchIntent = Intent(this, MainActivity::class.java).apply {
+        val launchIntent = Intent(this, AssistOverlayActivity::class.java).apply {
             action = Intent.ACTION_VOICE_COMMAND
-            putExtra("EXTRA_START_ASSISTANT_OVERLAY", true)
-            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT)
+            putExtra(AssistOverlayActivity.EXTRA_AUTO_LISTEN, true)
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP)
         }
         startActivity(launchIntent)
     }
@@ -159,9 +159,9 @@ class FloatingOverlayService : Service() {
         }
         val stopPending = PendingIntent.getService(this, 0, stopIntent, PendingIntent.FLAG_IMMUTABLE)
 
-        val openIntent = Intent(this, MainActivity::class.java).apply {
-            putExtra("EXTRA_START_ASSISTANT_OVERLAY", true)
-            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+        val openIntent = Intent(this, AssistOverlayActivity::class.java).apply {
+            putExtra(AssistOverlayActivity.EXTRA_AUTO_LISTEN, true)
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP
         }
         val openPending = PendingIntent.getActivity(this, 1, openIntent, PendingIntent.FLAG_IMMUTABLE)
 

@@ -21,6 +21,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.GraphicEq
@@ -29,6 +30,7 @@ import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Security
+import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -104,7 +106,7 @@ fun VoiceEnrollmentScreen(
             TopAppBar(
                 title = {
                     Text(
-                        text = "Voice Recognition Model",
+                        text = "Voice Recognition & Training",
                         fontSize = 18.sp,
                         fontWeight = FontWeight.Bold,
                         color = TextPrimary
@@ -145,15 +147,15 @@ fun VoiceEnrollmentScreen(
             ) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     RedOrbVisualizer(
-                        state = if (isTesting) AssistantUiState.LISTENING else AssistantUiState.IDLE,
+                        state = if (isTesting || testState.liveMatch.isTesting) AssistantUiState.LISTENING else AssistantUiState.IDLE,
                         audioLevel = testState.liveVolume,
-                        size = 140.dp
+                        size = 130.dp
                     )
 
                     Spacer(modifier = Modifier.height(14.dp))
 
                     Text(
-                        text = if (voiceProfile.isEnrolled) "Voice Model Enrolled" else "No Voice Model Enrolled",
+                        text = if (voiceProfile.isEnrolled) "Voice Model Calibrated & Active" else "Voice Model Not Trained",
                         fontSize = 17.sp,
                         fontWeight = FontWeight.Bold,
                         color = if (voiceProfile.isEnrolled) SuccessGreen else WarningAmber
@@ -163,9 +165,9 @@ fun VoiceEnrollmentScreen(
 
                     Text(
                         text = if (voiceProfile.isEnrolled) {
-                            "Calibrated for: ${voiceProfile.speakerName}"
+                            "Calibrated for: ${voiceProfile.speakerName} (${voiceProfile.totalSamplesCaptured} biometric samples)"
                         } else {
-                            "Take a voice calibration test to train Tecno AI on your voice profile like Gemini."
+                            "Train Tecno AI to recognize your specific voice tone, pitch, and timbre."
                         },
                         fontSize = 13.sp,
                         color = TextSecondary,
@@ -202,7 +204,7 @@ fun VoiceEnrollmentScreen(
                             )
                             Spacer(modifier = Modifier.width(8.dp))
                             Text(
-                                text = "Voice Calibration Test",
+                                text = "Voice Model Training",
                                 fontSize = 15.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = TextPrimary
@@ -215,7 +217,7 @@ fun VoiceEnrollmentScreen(
                                 color = CrimsonBright
                             ) {
                                 Text(
-                                    text = "RECORDING",
+                                    text = "TRAINING",
                                     fontSize = 10.sp,
                                     fontWeight = FontWeight.Black,
                                     letterSpacing = 1.sp,
@@ -263,7 +265,7 @@ fun VoiceEnrollmentScreen(
                         ) {
                             Icon(Icons.Default.Mic, contentDescription = null, tint = Color.White)
                             Spacer(modifier = Modifier.width(8.dp))
-                            Text("Begin Voice Test (3 Phrases)", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = Color.White)
+                            Text("Start Voice Training (3 Phrases)", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = Color.White)
                         }
                     } else {
                         // Live phrase prompt
@@ -311,7 +313,7 @@ fun VoiceEnrollmentScreen(
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
                             Text(
-                                text = "Samples: ${testState.capturedSamplesCount}",
+                                text = "Voice samples: ${testState.phraseVoiceSamplesCount}/15",
                                 fontSize = 11.sp,
                                 color = TextMuted
                             )
@@ -320,6 +322,34 @@ fun VoiceEnrollmentScreen(
                                 fontSize = 11.sp,
                                 color = TextAccent
                             )
+                        }
+
+                        if (isTesting) {
+                            Spacer(modifier = Modifier.height(12.dp))
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                OutlinedButton(
+                                    onClick = { viewModel.voiceTrainer.nextPhraseManual() },
+                                    shape = RoundedCornerShape(12.dp),
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = null, tint = TextPrimary, modifier = Modifier.size(16.dp))
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text("Next Phrase", fontSize = 12.sp, color = TextPrimary)
+                                }
+                                Button(
+                                    onClick = { viewModel.resetVoiceTrainer() },
+                                    colors = ButtonDefaults.buttonColors(containerColor = DarkSurfaceElevated),
+                                    shape = RoundedCornerShape(12.dp),
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    Icon(Icons.Default.Stop, contentDescription = null, tint = WarningAmber, modifier = Modifier.size(16.dp))
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text("Cancel", fontSize = 12.sp, color = WarningAmber)
+                                }
+                            }
                         }
 
                         if (testState.stage == VoiceTestStage.COMPLETED) {
@@ -336,7 +366,7 @@ fun VoiceEnrollmentScreen(
                             ) {
                                 Icon(Icons.Default.CheckCircle, contentDescription = null, tint = Color.White)
                                 Spacer(modifier = Modifier.width(6.dp))
-                                Text("Test Completed & Saved", color = Color.White, fontWeight = FontWeight.Bold)
+                                Text("Training Finished & Saved", color = Color.White, fontWeight = FontWeight.Bold)
                             }
                         }
                     }
@@ -380,7 +410,6 @@ fun VoiceEnrollmentScreen(
                         VoiceDataMetricRow(label = "Speaker Name", value = voiceProfile.speakerName)
                         VoiceDataMetricRow(label = "Fundamental Pitch (F0)", value = "${voiceProfile.averagePitchHz.toInt()} Hz")
                         VoiceDataMetricRow(label = "Spectral Centroid (Timbre)", value = "${voiceProfile.spectralCentroid.toInt()} Hz")
-                        VoiceDataMetricRow(label = "Energy Signature", value = "${voiceProfile.averageEnergy.toInt()} dB RMS")
                         VoiceDataMetricRow(label = "Confidence Gate", value = "${(voiceProfile.confidenceThreshold * 100).toInt()}% match")
                         val formattedDate = remember(voiceProfile.enrollmentDateTimestamp) {
                             if (voiceProfile.enrollmentDateTimestamp > 0L) {
@@ -388,6 +417,68 @@ fun VoiceEnrollmentScreen(
                             } else "Active"
                         }
                         VoiceDataMetricRow(label = "Enrollment Date", value = formattedDate)
+
+                        Spacer(modifier = Modifier.height(14.dp))
+
+                        // Live Voice Match Tester
+                        Surface(
+                            shape = RoundedCornerShape(14.dp),
+                            color = DarkSurface,
+                            border = androidx.compose.foundation.BorderStroke(1.dp, if (testState.liveMatch.isMatched) SuccessGreen else DarkBorder),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Column(modifier = Modifier.padding(12.dp)) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = "Live Match Tester",
+                                        fontSize = 13.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = TextPrimary
+                                    )
+                                    Button(
+                                        onClick = {
+                                            if (testState.liveMatch.isTesting) {
+                                                viewModel.voiceTrainer.stopLiveMatchTest()
+                                            } else {
+                                                viewModel.voiceTrainer.startLiveMatchTest(voiceProfile)
+                                            }
+                                        },
+                                        colors = ButtonDefaults.buttonColors(
+                                            containerColor = if (testState.liveMatch.isTesting) CrimsonDark else CrimsonBright
+                                        ),
+                                        shape = RoundedCornerShape(10.dp)
+                                    ) {
+                                        Text(if (testState.liveMatch.isTesting) "Stop Test" else "Test Match Live", fontSize = 12.sp, color = Color.White)
+                                    }
+                                }
+
+                                if (testState.liveMatch.isTesting) {
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                    Text(
+                                        text = testState.liveMatch.feedback,
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = if (testState.liveMatch.isMatched) SuccessGreen else TextAccent
+                                    )
+                                    if (testState.liveMatch.liveScore > 0f) {
+                                        Spacer(modifier = Modifier.height(4.dp))
+                                        LinearProgressIndicator(
+                                            progress = { testState.liveMatch.liveScore },
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .height(4.dp)
+                                                .clip(CircleShape),
+                                            color = if (testState.liveMatch.isMatched) SuccessGreen else CrimsonBright,
+                                            trackColor = DarkBorder
+                                        )
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
             }

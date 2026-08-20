@@ -24,19 +24,34 @@ class TecnoAiApp : Application() {
 
     private fun createNotificationChannels() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val channel = NotificationChannel(
+            val manager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+
+            val wakeChannel = NotificationChannel(
                 WAKE_WORD_CHANNEL_ID,
                 "Tecno AI Wake Word Service",
                 NotificationManager.IMPORTANCE_LOW
             ).apply {
                 description = "Active background listening for Hey Tecno wake phrase"
+                setShowBadge(false)
             }
-            val manager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-            manager.createNotificationChannel(channel)
+            manager.createNotificationChannel(wakeChannel)
+
+            val alertChannel = NotificationChannel(
+                ALERT_CHANNEL_ID,
+                "Tecno AI Instant Assistant Activation",
+                NotificationManager.IMPORTANCE_HIGH
+            ).apply {
+                description = "Heads-up alert and instant screen activation when saying Hey Tecno"
+                enableVibration(true)
+                enableLights(true)
+                setShowBadge(true)
+            }
+            manager.createNotificationChannel(alertChannel)
         }
     }
 
     companion object {
         const val WAKE_WORD_CHANNEL_ID = "tecno_wake_word_channel"
+        const val ALERT_CHANNEL_ID = "tecno_wake_alert_channel"
     }
 }

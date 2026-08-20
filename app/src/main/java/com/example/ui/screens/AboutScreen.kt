@@ -17,8 +17,11 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Psychology
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -30,6 +33,10 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -39,6 +46,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.ui.components.UpdateNewsDialog
 import com.example.ui.theme.CrimsonBright
 import com.example.ui.theme.CrimsonDark
 import com.example.ui.theme.CrimsonPrimary
@@ -59,6 +67,15 @@ fun AboutScreen(
     onNavigateBack: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    var showUpdateNews by remember { mutableStateOf(false) }
+
+    if (showUpdateNews) {
+        UpdateNewsDialog(
+            onDismiss = { showUpdateNews = false },
+            onExplorePowers = { showUpdateNews = false }
+        )
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -66,6 +83,11 @@ fun AboutScreen(
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack, modifier = Modifier.testTag("about_back_button")) {
                         Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = TextPrimary)
+                    }
+                },
+                actions = {
+                    IconButton(onClick = { showUpdateNews = true }, modifier = Modifier.testTag("about_update_news_button")) {
+                        Icon(Icons.Default.AutoAwesome, contentDescription = "What's New", tint = CrimsonBright)
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = DarkBackground)
@@ -108,7 +130,7 @@ fun AboutScreen(
                         Spacer(modifier = Modifier.height(14.dp))
 
                         Text(
-                            text = "TECNO AI",
+                            text = "TECNO AI 2.0",
                             fontSize = 22.sp,
                             fontWeight = FontWeight.Black,
                             letterSpacing = 2.sp,
@@ -125,7 +147,7 @@ fun AboutScreen(
                         Spacer(modifier = Modifier.height(6.dp))
 
                         Text(
-                            text = "Version 1.0.0 (Production)",
+                            text = "Version 2.0.0 (Production Release)",
                             fontSize = 11.sp,
                             color = TextMuted
                         )
@@ -138,6 +160,19 @@ fun AboutScreen(
                             fontWeight = FontWeight.Medium,
                             color = TextAccent
                         )
+
+                        Spacer(modifier = Modifier.height(14.dp))
+
+                        Button(
+                            onClick = { showUpdateNews = true },
+                            colors = ButtonDefaults.buttonColors(containerColor = CrimsonBright),
+                            shape = RoundedCornerShape(12.dp),
+                            modifier = Modifier.fillMaxWidth().testTag("view_release_notes_button")
+                        ) {
+                            Icon(Icons.Default.AutoAwesome, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("What's New in Update 2.0", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                        }
                     }
                 }
             }

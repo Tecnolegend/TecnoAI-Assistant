@@ -912,8 +912,9 @@ class MediaControlTool : DeviceTool {
     override suspend fun execute(context: Context, params: Map<String, Any?>): ToolResult {
         val action = (params["action"] as? String)?.trim()?.lowercase() ?: "toggle"
         val keyCode = when (action) {
-            "play" -> KeyEvent.KEYCODE_MEDIA_PLAY
+            "play", "resume", "unpause" -> KeyEvent.KEYCODE_MEDIA_PLAY
             "pause" -> KeyEvent.KEYCODE_MEDIA_PAUSE
+            "stop" -> KeyEvent.KEYCODE_MEDIA_STOP
             "next", "skip" -> KeyEvent.KEYCODE_MEDIA_NEXT
             "previous", "prev", "back" -> KeyEvent.KEYCODE_MEDIA_PREVIOUS
             else -> KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE
@@ -922,7 +923,15 @@ class MediaControlTool : DeviceTool {
         return if (audioManager != null) {
             audioManager.dispatchMediaKeyEvent(KeyEvent(KeyEvent.ACTION_DOWN, keyCode))
             audioManager.dispatchMediaKeyEvent(KeyEvent(KeyEvent.ACTION_UP, keyCode))
-            ToolResult(true, "Media action '$action' triggered.", mapOf("action" to action))
+            val actionLabel = when (action) {
+                "stop" -> "Music stopped"
+                "pause" -> "Playback paused"
+                "play", "resume" -> "Playback resumed"
+                "next", "skip" -> "Skipped to next track"
+                "previous", "prev" -> "Playing previous track"
+                else -> "Media toggled"
+            }
+            ToolResult(true, actionLabel, mapOf("action" to action))
         } else {
             ToolResult(false, "Audio service unavailable")
         }

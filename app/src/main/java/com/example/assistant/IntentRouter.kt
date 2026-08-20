@@ -183,7 +183,18 @@ class IntentRouter {
             }
         }
 
-        // 3. WhatsApp Messaging: "whatsapp mom hello", "send whatsapp to ...: ..."
+        // 3. WhatsApp Messaging & Controls: "whatsapp mom hello", "send whatsapp to ...", "whatsapp call dad", "open whatsapp chat with ..."
+        val waCallRegex = Pattern.compile("^(?:whatsapp\\s+call|call\\s+on\\s+whatsapp|video\\s+call\\s+on\\s+whatsapp)\\s+(?:to\\s+)?(.+)$", Pattern.CASE_INSENSITIVE)
+        val waCallMatcher = waCallRegex.matcher(cleaned)
+        if (waCallMatcher.find()) {
+            val target = waCallMatcher.group(1)?.trim() ?: ""
+            return AssistantDecision(
+                type = DecisionType.LOCAL_ACTION,
+                toolName = "whatsapp_control",
+                parameters = mapOf("action" to "call", "target_user" to target)
+            )
+        }
+
         val waRegex = Pattern.compile("^(?:send\\s+(?:a\\s+)?whatsapp\\s+(?:message\\s+)?to\\s+|whatsapp\\s+)([a-zA-Z0-9\\s+]+?)(?:\\s*[:;]\\s*|\\s+saying\\s+|\\s+that\\s+|\\s+)(.+)$", Pattern.CASE_INSENSITIVE)
         val waMatcher = waRegex.matcher(cleaned)
         if (waMatcher.find()) {
@@ -191,9 +202,94 @@ class IntentRouter {
             val msg = waMatcher.group(2)?.trim() ?: ""
             return AssistantDecision(
                 type = DecisionType.SENSITIVE_ACTION,
-                toolName = "whatsapp_send",
-                parameters = mapOf("phone_or_contact" to target, "message" to msg),
+                toolName = "whatsapp_control",
+                parameters = mapOf("action" to "send_message", "target_user" to target, "message" to msg),
                 requiresConfirmation = true
+            )
+        }
+
+        // 3.1 Discord Specialized Controls: "send discord message to ...", "discord chat ...", "open discord server"
+        val discordMsgRegex = Pattern.compile("^(?:send\\s+(?:a\\s+)?discord\\s+(?:message\\s+)?to\\s+|discord\\s+(?:message|chat)\\s+to\\s+|discord\\s+)([a-zA-Z0-9\\s_-]+?)(?:\\s*[:;]\\s*|\\s+saying\\s+|\\s+that\\s+|\\s+)(.+)$", Pattern.CASE_INSENSITIVE)
+        val discordMsgMatcher = discordMsgRegex.matcher(cleaned)
+        if (discordMsgMatcher.find()) {
+            val target = discordMsgMatcher.group(1)?.trim() ?: ""
+            val msg = discordMsgMatcher.group(2)?.trim() ?: ""
+            return AssistantDecision(
+                type = DecisionType.LOCAL_ACTION,
+                toolName = "discord_control",
+                parameters = mapOf("action" to "send_message", "target_user_or_channel" to target, "message" to msg)
+            )
+        }
+        if (cleaned.startsWith("discord ") || cleaned == "open discord" || cleaned.contains("on discord")) {
+            val query = cleaned.removePrefix("open discord").removePrefix("discord").replace("on discord", "").trim()
+            return AssistantDecision(
+                type = DecisionType.LOCAL_ACTION,
+                toolName = "discord_control",
+                parameters = mapOf("action" to if (query.isNotBlank()) "open_channel" else "open", "target_user_or_channel" to query)
+            )
+        }
+
+        // 3.2 Facebook Messenger Controls: "send messenger message to ...", "message ... on messenger"
+        val messengerRegex = Pattern.compile("^(?:send\\s+(?:a\\s+)?messenger\\s+(?:message\\s+)?to\\s+|message\\s+(.+?)\\s+on\\s+messenger(?:\\s*[:;]\\s*|\\s+saying\\s+|\\s+that\\s+|\\s+)|messenger\\s+([a-zA-Z0-9\\s_-]+?)(?:\\s*[:;]\\s*|\\s+saying\\s+|\\s+that\\s+|\\s+))(.+)$", Pattern.CASE_INSENSITIVE)
+        val messengerMatcher = messengerRegex.matcher(cleaned)
+        if (messengerMatcher.find()) {
+            val target = (messengerMatcher.group(1) ?: messengerMatcher.group(2))?.trim() ?: ""
+            val msg = messengerMatcher.group(3)?.trim() ?: ""
+            return AssistantDecision(
+                type = DecisionType.SENSITIVE_ACTION,
+                toolName = "messenger_control",
+                parameters = mapOf("action" to "send_message", "target_user" to target, "message" to msg),
+                requiresConfirmation = true
+            )
+        }
+
+        // 3.3 TikTok Specialized Controls: "search tiktok for ...", "next tiktok", "like tiktok", "tiktok scroll down"
+        if (cleaned.contains("tiktok") || cleaned.contains("tik tok")) {
+            val isNext = cleaned.contains("next") || cleaned.contains("scroll down") || cleaned.contains("swipe up") || cleaned.contains("swipe down")
+            val isPrev = cleaned.contains("previous") || cleaned.contains("scroll up") || cleaned.contains("prev")
+            val isLike = cleaned.contains("like") || cleaned.contains("heart")
+            val isTrends = cleaned.contains("trend") || cleaned.contains("explore") || cleaned.contains("popular")
+            val isSearch = cleaned.startsWith("search tiktok") || cleaned.contains("on tiktok") || cleaned.contains("search for")
+
+            when {
+                isNext -> return AssistantDecision(type = DecisionType.LOCAL_ACTION, toolName = "tiktok_control", parameters = mapOf("action" to "next_video"))
+                isPrev -> return AssistantDecision(type = DecisionType.LOCAL_ACTION, toolName = "tiktok_control", parameters = mapOf("action" to "prev_video"))
+                isLike -> return AssistantDecision(type = DecisionType.LOCAL_ACTION, toolName = "tiktok_control", parameters = mapOf("action" to "like"))
+                isTrends -> return AssistantDecision(type = DecisionType.LOCAL_ACTION, toolName = "tiktok_control", parameters = mapOf("action" to "open_trends"))
+                isSearch -> {
+                    val q = cleaned.replace("search tiktok for", "").replace("search tiktok", "").replace("on tiktok", "").replace("tiktok", "").replace("search", "").trim()
+                    return AssistantDecision(type = DecisionType.LOCAL_ACTION, toolName = "tiktok_control", parameters = mapOf("action" to "search", "query" to q))
+                }
+                else -> return AssistantDecision(type = DecisionType.LOCAL_ACTION, toolName = "tiktok_control", parameters = mapOf("action" to "open"))
+            }
+        }
+
+        // 3.4 Google Ecosystem (Google Search, Maps, Gmail Compose, Photos)
+        val emailRegex = Pattern.compile("^(?:send\\s+(?:an?\\s+)?email\\s+to|compose\\s+email\\s+to|gmail\\s+to)\\s+([a-zA-Z0-9@\\.\\s_-]+?)(?:\\s+about\\s+|\\s+saying\\s+|\\s+with\\s+subject\\s+|\\s+)(.+)$", Pattern.CASE_INSENSITIVE)
+        val emailMatcher = emailRegex.matcher(cleaned)
+        if (emailMatcher.find()) {
+            val recipient = emailMatcher.group(1)?.trim() ?: ""
+            val subject = emailMatcher.group(2)?.trim() ?: ""
+            return AssistantDecision(
+                type = DecisionType.LOCAL_ACTION,
+                toolName = "google_ecosystem",
+                parameters = mapOf("service" to "gmail_compose", "query_or_recipient" to recipient, "subject_or_message" to subject)
+            )
+        }
+        if (cleaned.startsWith("photos of ") || cleaned.startsWith("google photos ") || cleaned.startsWith("search photos for ")) {
+            val query = cleaned.removePrefix("photos of ").removePrefix("google photos ").removePrefix("search photos for ").trim()
+            return AssistantDecision(
+                type = DecisionType.LOCAL_ACTION,
+                toolName = "google_ecosystem",
+                parameters = mapOf("service" to "photos_search", "query_or_recipient" to query)
+            )
+        }
+        if (cleaned.startsWith("google ") && !cleaned.contains("maps") && !cleaned.contains("photos") && !cleaned.contains("drive")) {
+            val q = cleaned.removePrefix("google ").trim()
+            return AssistantDecision(
+                type = DecisionType.LOCAL_ACTION,
+                toolName = "google_ecosystem",
+                parameters = mapOf("service" to "search", "query_or_recipient" to q)
             )
         }
 
@@ -453,9 +549,20 @@ class IntentRouter {
             )
         }
 
-        // 14. Settings Patterns: "open wifi settings", "bluetooth settings", "wifi settings"
-        if ((cleaned.startsWith("open ") || cleaned.startsWith("turn on ") || cleaned.startsWith("show ")) && (cleaned.contains("setting") || cleaned.contains("wifi") || cleaned.contains("bluetooth") || cleaned.contains("display") || cleaned.contains("overlay"))) {
-            val dest = cleaned.removePrefix("open").removePrefix("turn on").removePrefix("show").replace("settings", "").replace("setting", "").trim()
+        // 14. Settings Patterns: "open settings", "settings", "open wifi settings", "bluetooth settings", "wifi settings"
+        if (cleaned == "open settings" || cleaned == "settings" || cleaned == "phone settings" ||
+            cleaned == "system settings" || cleaned == "device settings" || cleaned == "go to settings" ||
+            cleaned == "launch settings" || cleaned == "android settings") {
+            return AssistantDecision(
+                type = DecisionType.LOCAL_ACTION,
+                toolName = "open_settings",
+                parameters = mapOf("destination" to "general")
+            )
+        }
+
+        if ((cleaned.startsWith("open ") || cleaned.startsWith("turn on ") || cleaned.startsWith("show ") || cleaned.startsWith("go to ")) &&
+            (cleaned.contains("setting") || cleaned.contains("wifi") || cleaned.contains("bluetooth") || cleaned.contains("display") || cleaned.contains("overlay") || cleaned.contains("sound") || cleaned.contains("battery"))) {
+            val dest = cleaned.removePrefix("open").removePrefix("turn on").removePrefix("show").removePrefix("go to").replace("settings", "").replace("setting", "").trim()
             return AssistantDecision(
                 type = DecisionType.LOCAL_ACTION,
                 toolName = "open_settings",
@@ -527,29 +634,41 @@ class IntentRouter {
             )
         }
 
-        // 19. Media playback: "pause music", "resume music", "next song", "play music"
-        if (cleaned == "pause music" || cleaned == "pause" || cleaned == "stop music") {
+        // 19. Media playback: "stop music", "pause music", "resume music", "next song", "play music"
+        if (cleaned == "stop music" || cleaned == "stop audio" || cleaned == "stop song" ||
+            cleaned == "stop playing" || cleaned == "stop playback" || cleaned == "halt music") {
+            return AssistantDecision(
+                type = DecisionType.LOCAL_ACTION,
+                toolName = "media_control",
+                parameters = mapOf("action" to "stop")
+            )
+        }
+        if (cleaned == "pause music" || cleaned == "pause" || cleaned == "pause song" ||
+            cleaned == "pause playback" || cleaned == "pause audio") {
             return AssistantDecision(
                 type = DecisionType.LOCAL_ACTION,
                 toolName = "media_control",
                 parameters = mapOf("action" to "pause")
             )
         }
-        if (cleaned == "play music" || cleaned == "resume music" || cleaned == "play song") {
+        if (cleaned == "play music" || cleaned == "resume music" || cleaned == "play song" ||
+            cleaned == "resume song" || cleaned == "unpause" || cleaned == "resume playback") {
             return AssistantDecision(
                 type = DecisionType.LOCAL_ACTION,
                 toolName = "media_control",
                 parameters = mapOf("action" to "play")
             )
         }
-        if (cleaned == "next song" || cleaned == "skip track" || cleaned == "next track") {
+        if (cleaned == "next song" || cleaned == "skip track" || cleaned == "next track" ||
+            cleaned == "skip song" || cleaned == "forward track") {
             return AssistantDecision(
                 type = DecisionType.LOCAL_ACTION,
                 toolName = "media_control",
                 parameters = mapOf("action" to "next")
             )
         }
-        if (cleaned == "previous song" || cleaned == "prev track") {
+        if (cleaned == "previous song" || cleaned == "prev track" || cleaned == "previous track" ||
+            cleaned == "restart song" || cleaned == "prev song") {
             return AssistantDecision(
                 type = DecisionType.LOCAL_ACTION,
                 toolName = "media_control",

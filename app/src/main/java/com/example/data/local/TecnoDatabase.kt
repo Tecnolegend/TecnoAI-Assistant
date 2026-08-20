@@ -6,12 +6,20 @@ import androidx.room.Room
 import androidx.room.RoomDatabase
 
 @Database(
-    entities = [ConversationEntity::class],
-    version = 1,
+    entities = [
+        ConversationEntity::class,
+        UserRelationshipEntity::class,
+        UserPreferenceEntity::class,
+        UserActivityLogEntity::class
+    ],
+    version = 2,
     exportSchema = false
 )
 abstract class TecnoDatabase : RoomDatabase() {
     abstract fun conversationDao(): ConversationDao
+    abstract fun userRelationshipDao(): UserRelationshipDao
+    abstract fun userPreferenceDao(): UserPreferenceDao
+    abstract fun userActivityLogDao(): UserActivityLogDao
 
     companion object {
         @Volatile

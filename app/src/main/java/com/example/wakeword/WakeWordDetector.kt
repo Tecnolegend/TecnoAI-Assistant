@@ -9,6 +9,7 @@ import android.speech.RecognitionListener
 import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
 import android.util.Log
+import com.example.diagnostics.BugTracker
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -29,26 +30,52 @@ class WakeWordDetector(private val context: Context) {
     private var shouldKeepListening = false
     private var isRestarting = false
     private var isPaused = false
+    private var consecutiveErrorsCount = 0
 
+    // Comprehensive list of phonetic & textual variations for "Hey Tecno"
     private val wakePhrases = listOf(
         "hey tecno",
         "hi tecno",
         "hello tecno",
         "ok tecno",
         "okay tecno",
+        "tecno ai",
         "tecno",
         "hey techno",
         "hi techno",
         "hello techno",
         "ok techno",
         "okay techno",
-        "techno"
+        "techno ai",
+        "techno",
+        "hey tekno",
+        "hi tekno",
+        "hello tekno",
+        "ok tekno",
+        "okay tekno",
+        "tekno ai",
+        "tekno",
+        "hey tec no",
+        "hey tech no",
+        "hey tek no",
+        "hey tack know",
+        "hey take know",
+        "hey take no",
+        "hey tac no",
+        "hey tek",
+        "hi tek",
+        "he techno",
+        "he tecno",
+        "eight techno",
+        "eight tecno",
+        "hey technology"
     )
 
     fun startDetection(onWakeWordDetected: (String) -> Unit) {
         onDetectedCallback = onWakeWordDetected
         shouldKeepListening = true
         isPaused = false
+        consecutiveErrorsCount = 0
 
         mainHandler.post {
             initializeRecognizer()
@@ -90,6 +117,7 @@ class WakeWordDetector(private val context: Context) {
 
         if (!SpeechRecognizer.isRecognitionAvailable(context)) {
             Log.w(TAG, "Speech recognition service is not available on this device.")
+            BugTracker.logWarn(TAG, "SpeechRecognizer not available on this device")
             return
         }
 
@@ -99,6 +127,7 @@ class WakeWordDetector(private val context: Context) {
                     override fun onReadyForSpeech(params: Bundle?) {
                         _isListening.value = true
                         isRestarting = false
+                        consecutiveErrorsCount = 0
                     }
 
                     override fun onBeginningOfSpeech() {}
@@ -119,14 +148,35 @@ class WakeWordDetector(private val context: Context) {
                     override fun onError(error: Int) {
                         _energyLevel.value = 0f
                         _isListening.value = false
+                        consecutiveErrorsCount++
 
-                        // Gentle backoff restart to eliminate annoying rapid restart loops
+                        val errorDesc = when (error) {
+                            SpeechRecognizer.ERROR_AUDIO -> "Audio recording error"
+                            SpeechRecognizer.ERROR_CLIENT -> "Client-side error or timeout"
+                            SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS -> "Insufficient permissions"
+                            SpeechRecognizer.ERROR_NETWORK -> "Network error"
+                            SpeechRecognizer.ERROR_NETWORK_TIMEOUT -> "Network timeout"
+                            SpeechRecognizer.ERROR_NO_MATCH -> "No match"
+                            SpeechRecognizer.ERROR_RECOGNIZER_BUSY -> "Recognizer busy"
+                            SpeechRecognizer.ERROR_SERVER -> "Server error"
+                            SpeechRecognizer.ERROR_SPEECH_TIMEOUT -> "Speech timeout"
+                            else -> "Unknown error code: $error"
+                        }
+                        Log.d(TAG, "WakeWord recognizer error ($error): $errorDesc")
+
+                        // If recognizer is busy or repeatedly errored, recreate instance
+                        if (error == SpeechRecognizer.ERROR_RECOGNIZER_BUSY || consecutiveErrorsCount >= 3) {
+                            destroyRecognizer()
+                        }
+
+                        // Intelligent backoff restart to eliminate rapid restart loops
                         if (shouldKeepListening && !isPaused) {
                             val backoff = when (error) {
-                                SpeechRecognizer.ERROR_NO_MATCH -> 2000L
-                                SpeechRecognizer.ERROR_SPEECH_TIMEOUT -> 2500L
-                                SpeechRecognizer.ERROR_RECOGNIZER_BUSY -> 3000L
-                                SpeechRecognizer.ERROR_CLIENT -> 3500L
+                                SpeechRecognizer.ERROR_NO_MATCH -> 1500L
+                                SpeechRecognizer.ERROR_SPEECH_TIMEOUT -> 1800L
+                                SpeechRecognizer.ERROR_RECOGNIZER_BUSY -> 2500L
+                                SpeechRecognizer.ERROR_CLIENT -> 2000L
+                                SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS -> 5000L
                                 else -> 2000L
                             }
                             scheduleRestart(backoff)
@@ -137,7 +187,7 @@ class WakeWordDetector(private val context: Context) {
                         val matches = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
                         val handled = checkMatches(matches)
                         if (!handled && shouldKeepListening && !isPaused) {
-                            scheduleRestart(1200L)
+                            scheduleRestart(800L)
                         }
                     }
 
@@ -151,6 +201,7 @@ class WakeWordDetector(private val context: Context) {
             }
         } catch (e: Exception) {
             Log.e(TAG, "Failed to initialize recognizer: ${e.message}")
+            BugTracker.logError(TAG, "WakeWord init failed: ${e.message}")
         }
     }
 
@@ -158,13 +209,16 @@ class WakeWordDetector(private val context: Context) {
         if (matches.isNullOrEmpty() || isPaused) return false
 
         for (match in matches) {
-            val text = match.lowercase(Locale.getDefault()).trim()
-            for (phrase in wakePhrases) {
-                if (text.contains(phrase)) {
-                    Log.i(TAG, "Wake word matched: '$phrase' in '$text'")
-                    val query = text.substringAfter(phrase).trim()
+            val normalized = normalizeSpeech(match)
+            if (normalized.isBlank()) continue
 
-                    // Pause detection to allow response handling without microphone conflicts
+            // 1. Direct phrase matching
+            for (phrase in wakePhrases) {
+                if (normalized.contains(phrase)) {
+                    Log.i(TAG, "Wake word matched: '$phrase' in '$normalized'")
+                    val query = normalized.substringAfter(phrase).trim()
+
+                    // Pause detection to prevent mic contention
                     pauseDetection(5000L)
 
                     // Trigger detection callback
@@ -172,8 +226,28 @@ class WakeWordDetector(private val context: Context) {
                     return true
                 }
             }
+
+            // 2. Token-based heuristic matching for phonetic greetings + tecno
+            val tokens = normalized.split("\\s+".toRegex())
+            for (i in 0 until tokens.size) {
+                val token = tokens[i]
+                if (token == "tecno" || token == "techno" || token == "tekno") {
+                    Log.i(TAG, "Wake word token matched: '$token' in '$normalized'")
+                    val query = tokens.drop(i + 1).joinToString(" ").trim()
+                    pauseDetection(5000L)
+                    onDetectedCallback?.invoke(query)
+                    return true
+                }
+            }
         }
         return false
+    }
+
+    private fun normalizeSpeech(text: String): String {
+        return text.lowercase(Locale.getDefault())
+            .replace("[^a-z0-9\\s]".toRegex(), " ")
+            .replace("\\s+".toRegex(), " ")
+            .trim()
     }
 
     private fun startListeningInternal() {
@@ -188,7 +262,7 @@ class WakeWordDetector(private val context: Context) {
                 putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
                 putExtra(RecognizerIntent.EXTRA_LANGUAGE, Locale.getDefault().toLanguageTag())
                 putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
-                putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 3)
+                putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 5)
                 putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, 2500L)
                 putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS, 1800L)
             }
@@ -196,11 +270,12 @@ class WakeWordDetector(private val context: Context) {
             _isListening.value = true
         } catch (e: Exception) {
             Log.e(TAG, "Failed to start listening: ${e.message}")
-            scheduleRestart(3000L)
+            destroyRecognizer()
+            scheduleRestart(2500L)
         }
     }
 
-    private fun scheduleRestart(delayMillis: Long = 2000L) {
+    private fun scheduleRestart(delayMillis: Long = 1500L) {
         if (!shouldKeepListening || isRestarting || isPaused) return
         isRestarting = true
         _isListening.value = false
@@ -212,6 +287,7 @@ class WakeWordDetector(private val context: Context) {
                     startListeningInternal()
                 } catch (e: Exception) {
                     Log.e(TAG, "Error during restart: ${e.message}")
+                    destroyRecognizer()
                 } finally {
                     isRestarting = false
                 }
@@ -221,23 +297,28 @@ class WakeWordDetector(private val context: Context) {
         }, delayMillis)
     }
 
+    private fun destroyRecognizer() {
+        try {
+            speechRecognizer?.stopListening()
+            speechRecognizer?.cancel()
+            speechRecognizer?.destroy()
+        } catch (e: Exception) {
+            Log.d(TAG, "Error destroying recognizer: ${e.message}")
+        } finally {
+            speechRecognizer = null
+        }
+    }
+
     fun stopDetection() {
         shouldKeepListening = false
         isPaused = true
         _isListening.value = false
         _energyLevel.value = 0f
+        consecutiveErrorsCount = 0
         mainHandler.removeCallbacksAndMessages(null)
 
         mainHandler.post {
-            try {
-                speechRecognizer?.stopListening()
-                speechRecognizer?.cancel()
-                speechRecognizer?.destroy()
-            } catch (e: Exception) {
-                Log.e(TAG, "Error stopping recognizer: ${e.message}")
-            } finally {
-                speechRecognizer = null
-            }
+            destroyRecognizer()
         }
     }
 
@@ -245,3 +326,4 @@ class WakeWordDetector(private val context: Context) {
         private const val TAG = "WakeWordDetector"
     }
 }
+

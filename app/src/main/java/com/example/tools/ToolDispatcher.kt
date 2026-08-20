@@ -30,7 +30,12 @@ object ToolRegistry {
         ToggleFlashlightTool(),
         ScreenControlTool(),
         ScreenVisionTool(),
-        OptimizeAiTool()
+        OptimizeAiTool(),
+        WhatsAppSpecializedTool(),
+        DiscordControlTool(),
+        MessengerControlTool(),
+        TikTokControlTool(),
+        GoogleEcosystemTool()
     )
 
     private val toolMap = allTools.associateBy { it.definition.name }
@@ -57,6 +62,8 @@ class ToolDispatcher(private val context: Context) {
                 "call_contact" -> "Call ${params["contact_name_or_number"]}?"
                 "prepare_message" -> "Send message to ${params["contact_name_or_number"]}: \"${params["message"]}\"?"
                 "whatsapp_send" -> "Send WhatsApp message to ${params["phone_or_contact"]}: \"${params["message"]}\"?"
+                "whatsapp_control" -> "Send WhatsApp message to ${params["target_user"]}: \"${params["message"]}\"?"
+                "messenger_control" -> "Send Messenger message to ${params["target_user"]}: \"${params["message"]}\"?"
                 else -> "Execute ${tool.definition.name}?"
             }
             return ToolResult(

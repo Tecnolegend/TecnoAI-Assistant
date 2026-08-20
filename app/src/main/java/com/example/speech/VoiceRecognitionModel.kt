@@ -52,7 +52,7 @@ class VoiceRecognitionModel(private val context: Context) {
     }
 
     /**
-     * Compute acoustic features from raw 16-bit PCM audio buffer
+     * Compute acoustic features from raw 16-bit PCM audio buffer using Autocorrelation for accurate Pitch (F0)
      */
     fun extractAcousticFeatures(pcmBuffer: ShortArray, sampleRate: Int = 16000): Triple<Float, Float, Float> {
         if (pcmBuffer.isEmpty()) return Triple(0f, 0f, 0f)
@@ -64,14 +64,39 @@ class VoiceRecognitionModel(private val context: Context) {
         }
         val rms = sqrt(sumSquares / pcmBuffer.size).toFloat()
 
-        // 2. Zero Crossing Rate (ZCR) approx for pitch fundamental frequency estimation
-        var zeroCrossings = 0
-        for (i in 1 until pcmBuffer.size) {
-            if ((pcmBuffer[i] >= 0 && pcmBuffer[i - 1] < 0) || (pcmBuffer[i] < 0 && pcmBuffer[i - 1] >= 0)) {
-                zeroCrossings++
+        // 2. Autocorrelation for Pitch (F0) Estimation within human vocal range [80Hz - 400Hz]
+        val minPeriod = sampleRate / 400 // 40 samples at 16kHz
+        val maxPeriod = sampleRate / 80  // 200 samples at 16kHz
+        val windowSize = (pcmBuffer.size / 2).coerceAtMost(512)
+
+        var bestCorr = 0.0
+        var bestPeriod = 0
+
+        if (pcmBuffer.size >= maxPeriod + windowSize) {
+            for (lag in minPeriod..maxPeriod) {
+                var corr = 0.0
+                for (i in 0 until windowSize) {
+                    corr += pcmBuffer[i].toDouble() * pcmBuffer[i + lag].toDouble()
+                }
+                if (corr > bestCorr) {
+                    bestCorr = corr
+                    bestPeriod = lag
+                }
             }
         }
-        val approxFundamentalFreq = (zeroCrossings.toFloat() * sampleRate) / (2f * pcmBuffer.size)
+
+        val estimatedPitchHz = if (bestPeriod > 0 && bestCorr > 0) {
+            (sampleRate.toFloat() / bestPeriod).coerceIn(75f, 380f)
+        } else {
+            // Fallback to Zero Crossing Rate
+            var zcr = 0
+            for (i in 1 until pcmBuffer.size) {
+                if ((pcmBuffer[i] >= 0 && pcmBuffer[i - 1] < 0) || (pcmBuffer[i] < 0 && pcmBuffer[i - 1] >= 0)) {
+                    zcr++
+                }
+            }
+            ((zcr.toFloat() * sampleRate) / (2f * pcmBuffer.size)).coerceIn(80f, 350f)
+        }
 
         // 3. Spectral Centroid approximation via discrete magnitude weighting
         var weightedSum = 0.0
@@ -83,9 +108,9 @@ class VoiceRecognitionModel(private val context: Context) {
             weightedSum += freqBin * mag
             totalMag += mag
         }
-        val centroid = if (totalMag > 0) (weightedSum / totalMag).toFloat() else 1000f
+        val centroid = if (totalMag > 0) (weightedSum / totalMag).toFloat() else 1200f
 
-        return Triple(approxFundamentalFreq.coerceIn(60f, 450f), rms, centroid.coerceIn(200f, 4000f))
+        return Triple(estimatedPitchHz, rms, centroid.coerceIn(200f, 3800f))
     }
 
     suspend fun saveEnrolledVoiceProfile(
