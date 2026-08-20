@@ -45,18 +45,18 @@ class ExampleRobolectricTest {
 
         val openApp = router.parseFastIntent("open youtube")
         assertNotNull(openApp)
-        assertEquals("open_app", openApp?.name)
-        assertEquals("youtube", openApp?.parameters?.get("app_name"))
+        assertEquals("open_app", openApp?.toolName)
+        assertEquals("youtube", openApp?.args?.get("app_name"))
 
         val timer = router.parseFastIntent("set a timer for 10 minutes")
         assertNotNull(timer)
-        assertEquals("set_timer", timer?.name)
-        assertEquals(600, timer?.parameters?.get("seconds"))
+        assertEquals("set_timer", timer?.toolName)
+        assertEquals(600, timer?.args?.get("seconds"))
 
         val flashlight = router.parseFastIntent("turn on the flashlight")
         assertNotNull(flashlight)
-        assertEquals("toggle_flashlight", flashlight?.name)
-        assertEquals(true, flashlight?.parameters?.get("enabled"))
+        assertEquals("toggle_flashlight", flashlight?.toolName)
+        assertEquals(true, flashlight?.args?.get("enabled"))
     }
 
     @Test

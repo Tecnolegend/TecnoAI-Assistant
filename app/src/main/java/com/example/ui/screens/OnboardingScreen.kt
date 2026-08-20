@@ -96,7 +96,7 @@ fun OnboardingScreen(
             stepNumber = 1,
             title = "WELCOME",
             headline = "Say it. Tecno handles it.",
-            description = "Tecno AI is your high-speed action assistant built with native Android tool orchestration and Gemini intelligence.",
+            description = "Tecno AI is your high-speed action assistant built with native Android tool orchestration and advanced neural intelligence.",
             icon = Icons.Default.SmartToy
         ),
         OnboardingStep(

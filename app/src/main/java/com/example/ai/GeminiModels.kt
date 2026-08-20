@@ -46,8 +46,7 @@ data class GeminiGenerationConfig(
 
 @JsonClass(generateAdapter = true)
 data class GeminiToolWrapper(
-    val functionDeclarations: List<GeminiFunctionDeclaration>? = null,
-    val googleSearch: Map<String, Any?>? = null // For Google Search Grounding if enabled
+    val functionDeclarations: List<GeminiFunctionDeclaration>? = null
 )
 
 @JsonClass(generateAdapter = true)
@@ -66,7 +65,7 @@ data class GeminiParametersSchema(
 
 @JsonClass(generateAdapter = true)
 data class GeminiPropertySchema(
-    val type: String, // "STRING", "INTEGER", "BOOLEAN", "NUMBER"
+    val type: String,
     val description: String
 )
 
@@ -112,3 +111,4 @@ data class GeminiUsageMetadata(
     val candidatesTokenCount: Int? = null,
     val totalTokenCount: Int? = null
 )
+

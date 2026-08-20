@@ -5,9 +5,17 @@ import android.content.Context
 object ToolRegistry {
     val allTools: List<DeviceTool> = listOf(
         OpenAppTool(),
+        YouTubeControlTool(),
+        SpotifyControlTool(),
+        WhatsAppSendTool(),
+        NavigationMapsTool(),
+        GlobalGestureTool(),
+        CameraModeTool(),
         OpenUrlTool(),
         SearchWebTool(),
         VolumeControlTool(),
+        WifiControlTool(),
+        LaunchAppActivityTool(),
         BatteryStatusTool(),
         DeviceSpecsTool(),
         CalculateMathTool(),
@@ -19,7 +27,10 @@ object ToolRegistry {
         PrepareMessageTool(),
         MediaControlTool(),
         CopyToClipboardTool(),
-        ToggleFlashlightTool()
+        ToggleFlashlightTool(),
+        ScreenControlTool(),
+        ScreenVisionTool(),
+        OptimizeAiTool()
     )
 
     private val toolMap = allTools.associateBy { it.definition.name }
@@ -45,6 +56,7 @@ class ToolDispatcher(private val context: Context) {
             val description = when (name) {
                 "call_contact" -> "Call ${params["contact_name_or_number"]}?"
                 "prepare_message" -> "Send message to ${params["contact_name_or_number"]}: \"${params["message"]}\"?"
+                "whatsapp_send" -> "Send WhatsApp message to ${params["phone_or_contact"]}: \"${params["message"]}\"?"
                 else -> "Execute ${tool.definition.name}?"
             }
             return ToolResult(

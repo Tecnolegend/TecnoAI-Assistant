@@ -22,23 +22,33 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Alarm
-import androidx.compose.material.icons.filled.Apps
+import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.BatteryChargingFull
+import androidx.compose.material.icons.filled.CameraAlt
+import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.FlashlightOn
 import androidx.compose.material.icons.filled.History
+import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Mic
+import androidx.compose.material.icons.filled.Navigation
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Timer
+import androidx.compose.material.icons.filled.Videocam
 import androidx.compose.material.icons.filled.VolumeUp
+import androidx.compose.material.icons.filled.Whatsapp
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
@@ -49,6 +59,9 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -59,6 +72,9 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.data.PrebuiltTask
+import com.example.data.PrebuiltTasksRepository
+import com.example.data.TaskCategory
 import com.example.data.local.ConversationEntity
 import com.example.ui.components.RedOrbVisualizer
 import com.example.ui.theme.CrimsonBright
@@ -76,14 +92,9 @@ import com.example.ui.theme.TextAccent
 import com.example.ui.theme.TextMuted
 import com.example.ui.theme.TextPrimary
 import com.example.ui.theme.TextSecondary
+import com.example.ui.theme.WarningAmber
 import com.example.ui.viewmodel.AssistantUiState
 import com.example.ui.viewmodel.AssistantViewModel
-
-data class QuickActionItem(
-    val title: String,
-    val icon: ImageVector,
-    val command: String
-)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -93,21 +104,21 @@ fun AssistantHomeScreen(
     onNavigateToPermissions: () -> Unit,
     onNavigateToSettings: () -> Unit,
     onNavigateToAbout: () -> Unit,
+    onNavigateToVoiceModel: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val userSettings by viewModel.userSettings.collectAsState()
     val history by viewModel.conversationHistory.collectAsState()
-    val audioLevel by viewModel.speechRecognizerHelper.rmsLevel.collectAsState()
+    val audioLevel by viewModel.audioVolumeMeterHelper.normalizedVolume.collectAsState()
+    val voiceProfile by viewModel.voiceProfile.collectAsState()
 
-    val quickActions = listOf(
-        QuickActionItem("Open YouTube", Icons.Default.PlayArrow, "Open YouTube"),
-        QuickActionItem("10m Timer", Icons.Default.Timer, "Set a 10 minute timer"),
-        QuickActionItem("Wi-Fi Settings", Icons.Default.Settings, "Open Wi-Fi settings"),
-        QuickActionItem("AI News", Icons.Default.Search, "What are the latest AI news today?"),
-        QuickActionItem("7 AM Alarm", Icons.Default.Alarm, "Set alarm for 7:00 AM"),
-        QuickActionItem("Flashlight", Icons.Default.FlashlightOn, "Turn on flashlight")
-    )
+    var taskSearchQuery by remember { mutableStateOf("") }
+    var selectedCategory by remember { mutableStateOf(TaskCategory.ALL) }
+
+    val filteredTasks = remember(taskSearchQuery, selectedCategory) {
+        PrebuiltTasksRepository.searchTasks(taskSearchQuery, selectedCategory)
+    }
 
     Scaffold(
         topBar = {
@@ -116,7 +127,7 @@ fun AssistantHomeScreen(
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Box(
                             modifier = Modifier
-                                .size(8.dp)
+                                .size(10.dp)
                                 .clip(CircleShape)
                                 .background(CrimsonBright)
                         )
@@ -171,7 +182,7 @@ fun AssistantHomeScreen(
                 .padding(horizontal = 20.dp),
             verticalArrangement = Arrangement.spacedBy(18.dp)
         ) {
-            // Hero Orb & Status Header
+            // Siri/Gemini Dynamic Visualizer Card
             item {
                 Card(
                     colors = CardDefaults.cardColors(containerColor = DarkSurface),
@@ -208,7 +219,7 @@ fun AssistantHomeScreen(
                         Spacer(modifier = Modifier.height(4.dp))
 
                         Text(
-                            text = "Say it. Tecno handles it.",
+                            text = "Say it. Tecno controls your device.",
                             fontSize = 13.sp,
                             color = TextAccent
                         )
@@ -274,60 +285,170 @@ fun AssistantHomeScreen(
                 }
             }
 
-            // Quick Device Actions Grid
+            // Voice Recognition Model (Gemini-style Profile Calibration) Card
+            item {
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = DarkSurfaceElevated),
+                    border = CardDefaults.outlinedCardBorder().copy(
+                        brush = Brush.horizontalGradient(
+                            if (voiceProfile.isEnrolled) listOf(SuccessGreen, DarkBorder)
+                            else listOf(CrimsonBright, CrimsonDark)
+                        )
+                    ),
+                    shape = RoundedCornerShape(18.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { onNavigateToVoiceModel() }
+                        .testTag("voice_model_profile_card")
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(42.dp)
+                                    .clip(CircleShape)
+                                    .background(if (voiceProfile.isEnrolled) SuccessGreen.copy(alpha = 0.15f) else CrimsonSubtle),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    Icons.Default.Mic,
+                                    contentDescription = null,
+                                    tint = if (voiceProfile.isEnrolled) SuccessGreen else CrimsonBright,
+                                    modifier = Modifier.size(24.dp)
+                                )
+                            }
+
+                            Spacer(modifier = Modifier.width(12.dp))
+
+                            Column {
+                                Text(
+                                    text = if (voiceProfile.isEnrolled) "Voice Model Calibrated" else "Train Voice Model",
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = TextPrimary
+                                )
+                                Text(
+                                    text = if (voiceProfile.isEnrolled) "Speaker: ${voiceProfile.speakerName} • Tap to view data" else "Take test to recognize your voice like Gemini",
+                                    fontSize = 11.5.sp,
+                                    color = TextSecondary
+                                )
+                            }
+                        }
+
+                        Icon(
+                            Icons.Default.PlayArrow,
+                            contentDescription = "Test Voice",
+                            tint = if (voiceProfile.isEnrolled) SuccessGreen else CrimsonBright,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                }
+            }
+
+            // Prebuilt Tasks Library & In-App Control Hub
             item {
                 Column(modifier = Modifier.fillMaxWidth()) {
-                    Text(
-                        text = "QUICK ACTIONS",
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Bold,
-                        letterSpacing = 1.2.sp,
-                        color = TextMuted
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "PREBUILT POWERS & TASKS",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                            letterSpacing = 1.2.sp,
+                            color = TextMuted
+                        )
+                        Text(
+                            text = "${filteredTasks.size} Tasks",
+                            fontSize = 12.sp,
+                            color = CrimsonBright,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    // Task Search Bar
+                    OutlinedTextField(
+                        value = taskSearchQuery,
+                        onValueChange = { taskSearchQuery = it },
+                        placeholder = { Text("Search 1,000+ prebuilt tasks & powers...", color = TextMuted, fontSize = 13.sp) },
+                        leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = TextMuted, modifier = Modifier.size(18.dp)) },
+                        trailingIcon = {
+                            if (taskSearchQuery.isNotBlank()) {
+                                IconButton(onClick = { taskSearchQuery = "" }) {
+                                    Icon(Icons.Default.Clear, contentDescription = "Clear", tint = TextMuted, modifier = Modifier.size(16.dp))
+                                }
+                            }
+                        },
+                        singleLine = true,
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = CrimsonBright,
+                            unfocusedBorderColor = DarkBorder,
+                            focusedTextColor = TextPrimary,
+                            unfocusedTextColor = TextPrimary,
+                            focusedContainerColor = DarkSurfaceElevated,
+                            unfocusedContainerColor = DarkSurface
+                        ),
+                        shape = RoundedCornerShape(14.dp),
+                        modifier = Modifier.fillMaxWidth().testTag("search_tasks_input")
                     )
 
                     Spacer(modifier = Modifier.height(10.dp))
 
+                    // Category Filter Tabs
                     LazyRow(
-                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
                         contentPadding = PaddingValues(bottom = 4.dp)
                     ) {
-                        items(quickActions) { action ->
-                            Card(
-                                colors = CardDefaults.cardColors(containerColor = DarkSurfaceElevated),
-                                border = CardDefaults.outlinedCardBorder().copy(brush = Brush.verticalGradient(listOf(DarkBorder, CrimsonDark))),
-                                shape = RoundedCornerShape(16.dp),
-                                modifier = Modifier
-                                    .width(135.dp)
-                                    .clickable {
-                                        viewModel.openAssistantOverlay(startVoice = false)
-                                        viewModel.submitPrompt(action.command)
-                                    }
-                                    .testTag("quick_action_${action.title.replace(" ", "_")}")
+                        items(PrebuiltTasksRepository.categories) { category ->
+                            val isSelected = selectedCategory == category
+                            Surface(
+                                onClick = { selectedCategory = category },
+                                shape = RoundedCornerShape(20.dp),
+                                color = if (isSelected) CrimsonBright else DarkSurfaceElevated,
+                                border = androidx.compose.foundation.BorderStroke(1.dp, if (isSelected) CrimsonGlow else DarkBorder),
+                                modifier = Modifier.testTag("cat_chip_${category.name.lowercase()}")
                             ) {
-                                Column(
-                                    modifier = Modifier.padding(14.dp),
-                                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                                    verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    Box(
-                                        modifier = Modifier
-                                            .size(36.dp)
-                                            .clip(CircleShape)
-                                            .background(CrimsonSubtle),
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        Icon(action.icon, contentDescription = action.title, tint = CrimsonBright, modifier = Modifier.size(20.dp))
-                                    }
+                                    Text(category.icon, fontSize = 12.sp)
+                                    Spacer(modifier = Modifier.width(4.dp))
                                     Text(
-                                        text = action.title,
-                                        fontSize = 13.sp,
-                                        fontWeight = FontWeight.SemiBold,
-                                        color = TextPrimary
+                                        text = category.displayName,
+                                        fontSize = 12.sp,
+                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                        color = if (isSelected) Color.White else TextSecondary
                                     )
                                 }
                             }
                         }
                     }
                 }
+            }
+
+            // Task Cards
+            items(filteredTasks, key = { it.id }) { task ->
+                PrebuiltTaskCard(
+                    task = task,
+                    onExecute = {
+                        viewModel.openAssistantOverlay(startVoice = false)
+                        viewModel.submitPrompt(task.executeIntentText)
+                    }
+                )
             }
 
             // Recent Commands & Responses
@@ -373,7 +494,7 @@ fun AssistantHomeScreen(
                         ) {
                             Text("No recent commands yet", color = TextSecondary, fontSize = 14.sp)
                             Spacer(modifier = Modifier.height(4.dp))
-                            Text("Try saying \"Hey Tecno, open YouTube\" or tap the mic", color = TextMuted, fontSize = 12.sp)
+                            Text("Try saying \"Hey Tecno, open YouTube\" or tap any task above", color = TextMuted, fontSize = 12.sp)
                         }
                     }
                 }
@@ -388,6 +509,106 @@ fun AssistantHomeScreen(
                 Spacer(modifier = Modifier.height(60.dp))
             }
         }
+    }
+}
+
+@Composable
+fun PrebuiltTaskCard(
+    task: PrebuiltTask,
+    onExecute: () -> Unit
+) {
+    Card(
+        colors = CardDefaults.cardColors(containerColor = DarkSurfaceElevated),
+        border = CardDefaults.outlinedCardBorder().copy(brush = Brush.horizontalGradient(listOf(DarkBorder, CrimsonDark))),
+        shape = RoundedCornerShape(16.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onExecute() }
+            .testTag("prebuilt_task_${task.id}")
+    ) {
+        Row(
+            modifier = Modifier.padding(14.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(42.dp)
+                    .clip(CircleShape)
+                    .background(CrimsonSubtle),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = getIconForTask(task.iconName),
+                    contentDescription = task.title,
+                    tint = CrimsonBright,
+                    modifier = Modifier.size(22.dp)
+                )
+            }
+
+            Spacer(modifier = Modifier.width(12.dp))
+
+            Column(modifier = Modifier.weight(1f)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = task.title,
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = TextPrimary
+                    )
+                    if (task.isDeepControl) {
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Surface(shape = RoundedCornerShape(4.dp), color = CrimsonPrimary) {
+                            Text("Deep App", fontSize = 9.sp, color = Color.White, modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp))
+                        }
+                    }
+                }
+                Spacer(modifier = Modifier.height(2.dp))
+                Text(
+                    text = "🎤 \"${task.voicePhrase}\"",
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = CrimsonBright
+                )
+                Spacer(modifier = Modifier.height(2.dp))
+                Text(
+                    text = task.description,
+                    fontSize = 11.sp,
+                    color = TextSecondary
+                )
+            }
+
+            Spacer(modifier = Modifier.width(8.dp))
+
+            Surface(
+                shape = CircleShape,
+                color = CrimsonBright,
+                modifier = Modifier.size(32.dp)
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(Icons.Default.PlayArrow, contentDescription = "Run task", tint = Color.White, modifier = Modifier.size(18.dp))
+                }
+            }
+        }
+    }
+}
+
+fun getIconForTask(iconName: String): ImageVector {
+    return when (iconName) {
+        "youtube" -> Icons.Default.PlayArrow
+        "spotify" -> Icons.Default.VolumeUp
+        "camera" -> Icons.Default.CameraAlt
+        "videocam" -> Icons.Default.Videocam
+        "flashlight", "flashlight_off" -> Icons.Default.FlashlightOn
+        "volume_up", "volume_down", "volume_off" -> Icons.Default.VolumeUp
+        "wifi", "bluetooth" -> Icons.Default.Settings
+        "arrow_back" -> Icons.Default.ArrowBack
+        "home" -> Icons.Default.Home
+        "timer" -> Icons.Default.Timer
+        "alarm" -> Icons.Default.Alarm
+        "navigation", "local_cafe", "local_gas_station" -> Icons.Default.Navigation
+        "battery_full", "battery_charging" -> Icons.Default.BatteryChargingFull
+        "calculate" -> Icons.Default.AutoAwesome
+        else -> Icons.Default.AutoAwesome
     }
 }
 

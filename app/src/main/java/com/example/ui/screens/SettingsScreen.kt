@@ -2,7 +2,9 @@ package com.example.ui.screens
 
 import android.content.Context
 import android.content.Intent
+import android.net.Uri
 import android.os.Build
+import android.provider.Settings
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -17,7 +19,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -25,15 +26,17 @@ import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.GraphicEq
-import androidx.compose.material.icons.filled.Memory
+import androidx.compose.material.icons.filled.Key
+import androidx.compose.material.icons.filled.Layers
 import androidx.compose.material.icons.filled.Mic
-import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Psychology
-import androidx.compose.material.icons.filled.RecordVoiceOver
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.Speed
+import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.filled.Vibration
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material.icons.filled.VolumeUp
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -44,6 +47,8 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
@@ -56,7 +61,10 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -66,6 +74,8 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.ai.GeminiNetworkClient
@@ -82,7 +92,6 @@ import com.example.ui.theme.DarkSurface
 import com.example.ui.theme.DarkSurfaceElevated
 import com.example.ui.theme.DarkSurfaceVariant
 import com.example.ui.theme.SuccessGreen
-import com.example.ui.theme.TextAccent
 import com.example.ui.theme.TextMuted
 import com.example.ui.theme.TextPrimary
 import com.example.ui.theme.TextSecondary
@@ -95,17 +104,18 @@ import kotlinx.coroutines.launch
 fun SettingsScreen(
     viewModel: AssistantViewModel,
     onNavigateBack: () -> Unit,
+    onNavigateToVoiceModel: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
     val settings by viewModel.userSettings.collectAsState()
+    val voiceProfile by viewModel.voiceProfile.collectAsState()
     val authUser = rememberUserAuth()
     val coroutineScope = rememberCoroutineScope()
 
     val models = listOf(
-        "gemini-3.5-flash" to "Gemini 3.5 Flash (Recommended - Ultra Fast)",
-        "gemini-3.1-pro-preview" to "Gemini 3.1 Pro (Deep AI Consulting)",
-        "gemini-3.1-flash-lite-preview" to "Gemini 3.1 Flash Lite (Low Latency)"
+        "gemini-2.5-flash" to "Tecno Neural Flash 2.5 (Fast & Responsive - Recommended)",
+        "gemini-flash-latest" to "Tecno Neural Flash Ultra (Sub-second Latency)"
     )
 
     val soundThemes = listOf(
@@ -114,6 +124,17 @@ fun SettingsScreen(
         SoundCueHelper.SoundTheme.HYPER_ASCENT,
         SoundCueHelper.SoundTheme.MINIMAL_POP,
         SoundCueHelper.SoundTheme.MUTE
+    )
+
+    val languages = listOf(
+        "default" to "Default Device Language",
+        "en-US" to "English (United States)",
+        "en-GB" to "English (United Kingdom)",
+        "es-ES" to "Spanish (Español)",
+        "fr-FR" to "French (Français)",
+        "de-DE" to "German (Deutsch)",
+        "hi-IN" to "Hindi (हिन्दी)",
+        "zh-CN" to "Chinese (Mandarin)"
     )
 
     Scaffold(
@@ -161,17 +182,221 @@ fun SettingsScreen(
                             }
                             Spacer(modifier = Modifier.width(12.dp))
                             Column {
-                                Text("TECNO AI", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
+                                Text("TECNO AI 2.0", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
                                 Text("Owner & Creator: Tecnolegend", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = CrimsonBright)
                             }
                         }
                         Spacer(modifier = Modifier.height(8.dp))
                         Text(
-                            text = "Next-gen intelligent mobile assistant with full Android device powers, instant local execution, Siri-style bottom activation, and deep Gemini AI consultation.",
+                            text = "Next-generation intelligent Android voice assistant with deep device powers, instant in-app screen controls, sub-5ms instant responses, and 5-key neural failover.",
                             fontSize = 12.sp,
                             color = TextSecondary,
                             lineHeight = 16.sp
                         )
+                    }
+                }
+            }
+
+            // 5-KEY FAILOVER POOL SECTION
+            item {
+                SettingsSectionHeader(title = "TECNO AI 5-KEY FAILOVER POOL")
+            }
+
+            item {
+                SettingsCard {
+                    Text(
+                        text = "5-Key Automatic Failover System",
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = TextPrimary
+                    )
+                    Text(
+                        text = "Configure up to 5 API keys. If one key reaches rate limits or encounters an error, Tecno AI instantly switches to the next available key without interruption.",
+                        fontSize = 11.sp,
+                        color = TextMuted,
+                        lineHeight = 15.sp
+                    )
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    val keys = listOf(
+                        Triple(1, "Primary Key (Slot 1)", settings.apiKey1),
+                        Triple(2, "Backup Key 1 (Slot 2)", settings.apiKey2),
+                        Triple(3, "Backup Key 2 (Slot 3)", settings.apiKey3),
+                        Triple(4, "Backup Key 3 (Slot 4)", settings.apiKey4),
+                        Triple(5, "Backup Key 5 (Slot 5)", settings.apiKey5)
+                    )
+
+                    keys.forEach { (index, label, currentKey) ->
+                        ApiKeySlotInput(
+                            index = index,
+                            label = label,
+                            savedKey = currentKey,
+                            onSaveKey = { newKey ->
+                                viewModel.updateApiKey(index, newKey)
+                            }
+                        )
+                        if (index < 5) {
+                            Spacer(modifier = Modifier.height(8.dp))
+                        }
+                    }
+                }
+            }
+
+            // Floating Overlay Superpower
+            item {
+                SettingsSectionHeader(title = "SYSTEM OVERLAY & FLOATING BUBBLE")
+            }
+
+            item {
+                SettingsCard {
+                    SettingsSwitchRow(
+                        title = "Floating Bubble Over Other Apps",
+                        subtitle = "Shows a floating quick-access red badge that stays over other apps for instant one-tap activation.",
+                        icon = Icons.Default.Layers,
+                        checked = settings.isOverlayBubbleEnabled,
+                        onCheckedChange = { enabled ->
+                            if (enabled && !Settings.canDrawOverlays(context)) {
+                                val intent = Intent(
+                                    Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                                    Uri.parse("package:${context.packageName}")
+                                ).apply { flags = Intent.FLAG_ACTIVITY_NEW_TASK }
+                                context.startActivity(intent)
+                            } else {
+                                viewModel.updateOverlayBubbleEnabled(enabled)
+                            }
+                        },
+                        tag = "toggle_floating_bubble"
+                    )
+
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    SettingsSwitchRow(
+                        title = "Auto-Listen on Overlay Open",
+                        subtitle = "Immediately activate microphone when assistant is opened.",
+                        icon = Icons.Default.Mic,
+                        checked = settings.autoListenOnOverlayOpen,
+                        onCheckedChange = { viewModel.updateAutoListenOnOpen(it) },
+                        tag = "toggle_auto_listen"
+                    )
+                }
+            }
+
+            // Voice Recognition & Calibration
+            item {
+                SettingsSectionHeader(title = "VOICE RECOGNITION & CALIBRATION")
+            }
+
+            item {
+                SettingsCard {
+                    Surface(
+                        onClick = onNavigateToVoiceModel,
+                        shape = RoundedCornerShape(12.dp),
+                        color = if (voiceProfile.isEnrolled) SuccessGreen.copy(alpha = 0.12f) else CrimsonSubtle,
+                        border = androidx.compose.foundation.BorderStroke(
+                            1.dp,
+                            if (voiceProfile.isEnrolled) SuccessGreen.copy(alpha = 0.4f) else CrimsonBright.copy(alpha = 0.4f)
+                        ),
+                        modifier = Modifier.fillMaxWidth().testTag("voice_calibration_card")
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(14.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(36.dp)
+                                        .clip(CircleShape)
+                                        .background(if (voiceProfile.isEnrolled) SuccessGreen.copy(alpha = 0.2f) else CrimsonSubtle),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        Icons.Default.Mic,
+                                        contentDescription = null,
+                                        tint = if (voiceProfile.isEnrolled) SuccessGreen else CrimsonBright,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                }
+                                Spacer(modifier = Modifier.width(12.dp))
+                                Column {
+                                    Text(
+                                        text = if (voiceProfile.isEnrolled) "Voice Model: Enrolled (${voiceProfile.speakerName})" else "Voice Model: Not Calibrated",
+                                        fontSize = 13.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = TextPrimary
+                                    )
+                                    Text(
+                                        text = if (voiceProfile.isEnrolled) "Tap to test or re-calibrate your voice profile" else "Take test to save your unique voice profile in Tecno AI",
+                                        fontSize = 11.sp,
+                                        color = TextSecondary
+                                    )
+                                }
+                            }
+                            Icon(
+                                Icons.Default.PlayArrow,
+                                contentDescription = null,
+                                tint = if (voiceProfile.isEnrolled) SuccessGreen else CrimsonBright,
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(14.dp))
+
+                    Text(
+                        text = "Microphone Volume Sensitivity Gain: ${(settings.micSensitivityGain * 100).toInt()}%",
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = TextPrimary
+                    )
+                    Text(
+                        text = "Boost this if the AI has trouble picking up your voice in noisy or quiet environments.",
+                        fontSize = 11.sp,
+                        color = TextMuted
+                    )
+                    Slider(
+                        value = settings.micSensitivityGain,
+                        onValueChange = { viewModel.updateMicSensitivityGain(it) },
+                        valueRange = 0.5f..2.5f,
+                        colors = SliderDefaults.colors(
+                            thumbColor = CrimsonBright,
+                            activeTrackColor = CrimsonPrimary,
+                            inactiveTrackColor = DarkBorder
+                        ),
+                        modifier = Modifier.testTag("slider_mic_gain")
+                    )
+
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    Text(
+                        text = "Speech Recognition Language",
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = TextPrimary
+                    )
+                    Spacer(modifier = Modifier.height(6.dp))
+                    languages.forEach { (code, label) ->
+                        val isSelected = settings.speechLanguage == code
+                        Surface(
+                            onClick = { viewModel.updateSpeechLanguage(code) },
+                            shape = RoundedCornerShape(10.dp),
+                            color = if (isSelected) CrimsonSubtle else DarkSurface,
+                            border = androidx.compose.foundation.BorderStroke(1.dp, if (isSelected) CrimsonBright else DarkBorder),
+                            modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(text = label, fontSize = 12.sp, color = if (isSelected) TextPrimary else TextSecondary)
+                                if (isSelected) {
+                                    Icon(Icons.Default.Check, contentDescription = null, tint = CrimsonBright, modifier = Modifier.size(16.dp))
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -397,9 +622,9 @@ fun SettingsScreen(
                 }
             }
 
-            // Gemini Model Selection
+            // Neural Model Selection
             item {
-                SettingsSectionHeader(title = "AI INTELLIGENCE & CONSULTING MODEL")
+                SettingsSectionHeader(title = "TECNO AI NEURAL MODEL ENGINE")
             }
 
             item {
@@ -603,14 +828,11 @@ fun SettingsScreen(
 
             item {
                 SettingsCard {
-                    val apiKey = GeminiNetworkClient.getApiKey()
-                    val hasKey = apiKey.isNotBlank() && apiKey != "MY_GEMINI_API_KEY"
-
-                    DiagnosticRow("Registered Mobile Powers", "${ToolRegistry.allTools.size} Powers Active")
+                    DiagnosticRow("Registered Mobile Powers", "${ToolRegistry.allTools.size} Superpowers Active")
                     Spacer(modifier = Modifier.height(8.dp))
                     DiagnosticRow("Owner & Developer", "Tecnolegend")
                     Spacer(modifier = Modifier.height(8.dp))
-                    DiagnosticRow("Gemini AI Intelligence", if (hasKey) "Online & Connected" else "Direct Tool Mode")
+                    DiagnosticRow("Tecno AI Neural Engine", "Active (5-Key Failover Enabled)")
                     Spacer(modifier = Modifier.height(8.dp))
                     DiagnosticRow("Wake Word Service", if (settings.isWakeWordEnabled) "Background Listening Active" else "Disabled")
                 }
@@ -618,6 +840,105 @@ fun SettingsScreen(
 
             item {
                 Spacer(modifier = Modifier.height(40.dp))
+            }
+        }
+    }
+}
+
+@Composable
+fun ApiKeySlotInput(
+    index: Int,
+    label: String,
+    savedKey: String,
+    onSaveKey: (String) -> Unit
+) {
+    var textValue by remember(savedKey) { mutableStateOf(savedKey) }
+    var isVisible by remember { mutableStateOf(false) }
+    val isConfigured = savedKey.isNotBlank()
+
+    Surface(
+        shape = RoundedCornerShape(10.dp),
+        color = DarkSurface,
+        border = androidx.compose.foundation.BorderStroke(1.dp, if (isConfigured) CrimsonBright.copy(alpha = 0.5f) else DarkBorder),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(modifier = Modifier.padding(10.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        Icons.Default.Key,
+                        contentDescription = null,
+                        tint = if (isConfigured) CrimsonBright else TextMuted,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = label,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = if (isConfigured) TextPrimary else TextSecondary
+                    )
+                }
+
+                Surface(
+                    shape = RoundedCornerShape(4.dp),
+                    color = if (isConfigured) SuccessGreen.copy(alpha = 0.15f) else DarkSurfaceVariant
+                ) {
+                    Text(
+                        text = if (isConfigured) "● Active" else "Empty",
+                        fontSize = 10.sp,
+                        color = if (isConfigured) SuccessGreen else TextMuted,
+                        fontWeight = FontWeight.SemiBold,
+                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(6.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                OutlinedTextField(
+                    value = textValue,
+                    onValueChange = { textValue = it },
+                    placeholder = { Text("Paste Key #$index here", fontSize = 12.sp, color = TextMuted) },
+                    visualTransformation = if (isVisible) VisualTransformation.None else PasswordVisualTransformation(),
+                    singleLine = true,
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = CrimsonBright,
+                        unfocusedBorderColor = DarkBorder,
+                        focusedTextColor = TextPrimary,
+                        unfocusedTextColor = TextSecondary
+                    ),
+                    modifier = Modifier.weight(1f),
+                    trailingIcon = {
+                        IconButton(onClick = { isVisible = !isVisible }) {
+                            Icon(
+                                if (isVisible) Icons.Default.VisibilityOff else Icons.Default.Visibility,
+                                contentDescription = "Toggle visibility",
+                                tint = TextMuted,
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
+                    }
+                )
+
+                Spacer(modifier = Modifier.width(8.dp))
+
+                Button(
+                    onClick = { onSaveKey(textValue) },
+                    colors = ButtonDefaults.buttonColors(containerColor = if (textValue != savedKey) CrimsonBright else DarkSurfaceVariant),
+                    shape = RoundedCornerShape(8.dp),
+                    modifier = Modifier.testTag("save_key_$index")
+                ) {
+                    Text("Save", fontSize = 12.sp, color = if (textValue != savedKey) Color.White else TextMuted)
+                }
             }
         }
     }

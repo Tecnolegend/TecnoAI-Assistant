@@ -57,7 +57,7 @@ class GreetingScreenshotTest {
                         .background(DarkBackground),
                     contentAlignment = Alignment.Center
                 ) {
-                    RedOrbVisualizer(state = AssistantUiState.LISTENING, size = 180.dp, audioAmplitude = 0.8f)
+                    RedOrbVisualizer(state = AssistantUiState.LISTENING, size = 180.dp, audioLevel = 0.8f)
                 }
             }
         }

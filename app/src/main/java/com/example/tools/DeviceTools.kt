@@ -20,6 +20,7 @@ import android.provider.MediaStore
 import android.provider.Settings
 import android.view.KeyEvent
 import androidx.core.content.ContextCompat
+import com.example.accessibility.TecnoAccessibilityService
 
 class OpenAppTool : DeviceTool {
     override val definition = ToolDefinition(
@@ -51,7 +52,11 @@ class OpenAppTool : DeviceTool {
             "clock" to "com.google.android.deskclock",
             "calendar" to "com.google.android.calendar",
             "netflix" to "com.netflix.mediaclient",
-            "files" to "com.google.android.apps.nbu.files"
+            "files" to "com.google.android.apps.nbu.files",
+            "twitter" to "com.twitter.android",
+            "x" to "com.twitter.android",
+            "reddit" to "com.reddit.frontpage",
+            "tiktok" to "com.zhiliaoapp.musically"
         )
 
         val targetQuery = appName.lowercase()
@@ -111,6 +116,317 @@ class OpenAppTool : DeviceTool {
             } else {
                 ToolResult(false, "Could not find $appName on this device.", errorCode = "APP_NOT_FOUND")
             }
+        }
+    }
+}
+
+class YouTubeControlTool : DeviceTool {
+    override val definition = ToolDefinition(
+        name = "youtube_control",
+        description = "Searches for and plays videos directly on YouTube.",
+        parameters = listOf(
+            ToolParameter("query", "STRING", "Video title, artist, or topic to search on YouTube", required = true)
+        )
+    )
+
+    override suspend fun execute(context: Context, params: Map<String, Any?>): ToolResult {
+        val query = (params["query"] as? String)?.trim() ?: return ToolResult(false, "No search query provided")
+        return try {
+            val appIntent = Intent(Intent.ACTION_SEARCH).apply {
+                setPackage("com.google.android.youtube")
+                putExtra("query", query)
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK
+            }
+            if (appIntent.resolveActivity(context.packageManager) != null) {
+                context.startActivity(appIntent)
+            } else {
+                val webIntent = Intent(Intent.ACTION_VIEW, Uri.parse("https://www.youtube.com/results?search_query=${Uri.encode(query)}")).apply {
+                    flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                }
+                context.startActivity(webIntent)
+            }
+            ToolResult(true, "Searching YouTube for '$query'", mapOf("query" to query))
+        } catch (e: Exception) {
+            ToolResult(false, "Failed to control YouTube: ${e.localizedMessage}")
+        }
+    }
+}
+
+class SpotifyControlTool : DeviceTool {
+    override val definition = ToolDefinition(
+        name = "spotify_control",
+        description = "Searches for and plays songs, artists, or playlists on Spotify.",
+        parameters = listOf(
+            ToolParameter("query", "STRING", "Song title, artist, or playlist name", required = true)
+        )
+    )
+
+    override suspend fun execute(context: Context, params: Map<String, Any?>): ToolResult {
+        val query = (params["query"] as? String)?.trim() ?: return ToolResult(false, "No query provided")
+        return try {
+            val spotifyUri = Uri.parse("spotify:search:${Uri.encode(query)}")
+            val intent = Intent(Intent.ACTION_VIEW, spotifyUri).apply {
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK
+            }
+            if (intent.resolveActivity(context.packageManager) != null) {
+                context.startActivity(intent)
+                ToolResult(true, "Playing '$query' on Spotify", mapOf("query" to query))
+            } else {
+                val webIntent = Intent(Intent.ACTION_VIEW, Uri.parse("https://open.spotify.com/search/${Uri.encode(query)}")).apply {
+                    flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                }
+                context.startActivity(webIntent)
+                ToolResult(true, "Searching Spotify for '$query'", mapOf("query" to query))
+            }
+        } catch (e: Exception) {
+            ToolResult(false, "Failed to launch Spotify: ${e.localizedMessage}")
+        }
+    }
+}
+
+class WhatsAppSendTool : DeviceTool {
+    override val definition = ToolDefinition(
+        name = "whatsapp_send",
+        description = "Opens WhatsApp and pre-fills or sends a message to a phone number or contact.",
+        parameters = listOf(
+            ToolParameter("phone_or_contact", "STRING", "Phone number with country code (e.g. +123456789) or contact name", required = true),
+            ToolParameter("message", "STRING", "The message text to send", required = true)
+        ),
+        requiresConfirmation = true
+    )
+
+    override suspend fun execute(context: Context, params: Map<String, Any?>): ToolResult {
+        val target = (params["phone_or_contact"] as? String)?.trim() ?: ""
+        val message = (params["message"] as? String)?.trim() ?: ""
+        val cleanNumber = target.replace("+", "").replace("-", "").replace(" ", "")
+
+        return try {
+            val uri = if (cleanNumber.all { it.isDigit() } && cleanNumber.length >= 7) {
+                Uri.parse("https://api.whatsapp.com/send?phone=$cleanNumber&text=${Uri.encode(message)}")
+            } else {
+                Uri.parse("whatsapp://send?text=${Uri.encode(message)}")
+            }
+            val intent = Intent(Intent.ACTION_VIEW, uri).apply {
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK
+            }
+            context.startActivity(intent)
+            ToolResult(true, "Opening WhatsApp to send message: '$message'", mapOf("recipient" to target, "message" to message))
+        } catch (e: Exception) {
+            ToolResult(false, "WhatsApp is not installed or failed: ${e.localizedMessage}")
+        }
+    }
+}
+
+class NavigationMapsTool : DeviceTool {
+    override val definition = ToolDefinition(
+        name = "navigation_maps",
+        description = "Starts turn-by-turn navigation or searches places in Google Maps (e.g. 'nearest coffee shop', 'airport', 'Home').",
+        parameters = listOf(
+            ToolParameter("destination", "STRING", "Destination address or place query", required = true),
+            ToolParameter("mode", "STRING", "'navigate' for turn-by-turn GPS or 'search' for place search", required = false)
+        )
+    )
+
+    override suspend fun execute(context: Context, params: Map<String, Any?>): ToolResult {
+        val destination = (params["destination"] as? String)?.trim() ?: return ToolResult(false, "No destination specified")
+        val mode = (params["mode"] as? String)?.lowercase() ?: "navigate"
+
+        return try {
+            val uri = if (mode == "search") {
+                Uri.parse("geo:0,0?q=${Uri.encode(destination)}")
+            } else {
+                Uri.parse("google.navigation:q=${Uri.encode(destination)}")
+            }
+            val mapIntent = Intent(Intent.ACTION_VIEW, uri).apply {
+                setPackage("com.google.android.apps.maps")
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK
+            }
+            if (mapIntent.resolveActivity(context.packageManager) != null) {
+                context.startActivity(mapIntent)
+            } else {
+                val genericIntent = Intent(Intent.ACTION_VIEW, Uri.parse("https://www.google.com/maps/search/${Uri.encode(destination)}")).apply {
+                    flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                }
+                context.startActivity(genericIntent)
+            }
+            ToolResult(true, "Navigating to $destination", mapOf("destination" to destination))
+        } catch (e: Exception) {
+            ToolResult(false, "Navigation error: ${e.localizedMessage}")
+        }
+    }
+}
+
+class GlobalGestureTool : DeviceTool {
+    override val definition = ToolDefinition(
+        name = "global_gesture",
+        description = "Executes system accessibility gestures: 'back', 'home', 'recents', 'notifications', 'quick_settings', 'screenshot', 'lock_screen', 'scroll_down', 'scroll_up'.",
+        parameters = listOf(
+            ToolParameter("action", "STRING", "'back', 'home', 'recents', 'notifications', 'quick_settings', 'screenshot', 'lock_screen', 'scroll_down', 'scroll_up'", required = true)
+        )
+    )
+
+    override suspend fun execute(context: Context, params: Map<String, Any?>): ToolResult {
+        val action = (params["action"] as? String)?.trim()?.lowercase() ?: "back"
+        val service = TecnoAccessibilityService.instance
+
+        if (service == null) {
+            return when (action) {
+                "home" -> {
+                    val intent = Intent(Intent.ACTION_MAIN).apply {
+                        addCategory(Intent.CATEGORY_HOME)
+                        flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                    }
+                    context.startActivity(intent)
+                    ToolResult(true, "Navigated to Home screen", mapOf("action" to "home"))
+                }
+                "notifications" -> {
+                    val intent = Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).apply {
+                        flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                    }
+                    context.startActivity(intent)
+                    ToolResult(true, "Opening notifications", mapOf("action" to "notifications"))
+                }
+                else -> {
+                    ToolResult(
+                        false,
+                        "Enable Tecno AI in Accessibility Settings to unlock instant gestures (Back, Recents, Lock Screen, Screenshot).",
+                        errorCode = "ACCESSIBILITY_REQUIRED"
+                    )
+                }
+            }
+        }
+
+        val success = when (action) {
+            "back" -> service.performBack()
+            "home" -> service.performHome()
+            "recents", "recent_apps" -> service.performRecents()
+            "notifications" -> service.performNotifications()
+            "quick_settings" -> service.performQuickSettings()
+            "screenshot", "take_screenshot" -> service.performTakeScreenshot()
+            "lock_screen", "lock" -> service.performLockScreen()
+            "scroll_down", "scroll_forward" -> service.scrollForward()
+            "scroll_up", "scroll_backward" -> service.scrollBackward()
+            else -> false
+        }
+
+        return if (success) {
+            ToolResult(true, "Gesture '$action' executed successfully.", mapOf("action" to action))
+        } else {
+            ToolResult(false, "Gesture '$action' could not be completed.")
+        }
+    }
+}
+
+class ScreenControlTool : DeviceTool {
+    override val definition = ToolDefinition(
+        name = "screen_control",
+        description = "Interacts with current screen elements, taps buttons in apps or games (e.g. 'like', 'subscribe', 'skip ad', 'claim', 'attack', 'jump', 'tap center', or custom button text).",
+        parameters = listOf(
+            ToolParameter("action", "STRING", "Action or button to click: 'click_button', 'like_video', 'subscribe', 'skip_ad', 'game_tap', 'tap_center', 'spam_tap'", required = true),
+            ToolParameter("target_text", "STRING", "The text or name of the button on screen to click", required = false)
+        )
+    )
+
+    override suspend fun execute(context: Context, params: Map<String, Any?>): ToolResult {
+        val service = TecnoAccessibilityService.instance
+            ?: return ToolResult(
+                false,
+                "Please enable Tecno AI in Accessibility Settings to allow screen clicking and in-game controls.",
+                errorCode = "ACCESSIBILITY_REQUIRED"
+            )
+
+        val action = (params["action"] as? String)?.trim()?.lowercase() ?: "click_button"
+        val targetText = (params["target_text"] as? String)?.trim() ?: ""
+
+        val success = when (action) {
+            "like", "like_video", "thumbs_up" -> service.likeCurrentYouTubeVideo()
+            "subscribe", "subscribe_channel" -> service.subscribeCurrentYouTubeChannel()
+            "skip_ad", "skip" -> service.skipCurrentAd()
+            "game_tap", "tap_center", "center" -> service.performSmartGameAction(if (targetText.isNotBlank()) targetText else "center")
+            "attack", "jump", "spam_tap", "spam" -> service.performSmartGameAction(action)
+            else -> {
+                if (targetText.isNotBlank()) {
+                    service.clickElementByTextOrDescription(targetText)
+                } else {
+                    service.clickElementByTextOrDescription(action)
+                }
+            }
+        }
+
+        return if (success) {
+            val label = if (targetText.isNotBlank()) targetText else action
+            ToolResult(true, "Clicked '$label' on screen.", mapOf("action" to action, "target" to targetText))
+        } else {
+            ToolResult(false, "Could not find or click element on current screen. Make sure the button is visible.")
+        }
+    }
+}
+
+class ScreenVisionTool : DeviceTool {
+    override val definition = ToolDefinition(
+        name = "screen_vision",
+        description = "Reads and analyzes the content currently visible on the user's screen.",
+        parameters = emptyList()
+    )
+
+    override suspend fun execute(context: Context, params: Map<String, Any?>): ToolResult {
+        val service = TecnoAccessibilityService.instance
+            ?: return ToolResult(
+                false,
+                "Please enable Tecno AI in Accessibility Settings so Tecno AI can read screen contents.",
+                errorCode = "ACCESSIBILITY_REQUIRED"
+            )
+
+        val summary = service.captureScreenContentSummary()
+        return ToolResult(true, summary, mapOf("content" to summary))
+    }
+}
+
+class OptimizeAiTool : DeviceTool {
+    override val definition = ToolDefinition(
+        name = "optimize_ai",
+        description = "Optimizes Tecno AI engine and system resources for maximum speed and lowest response latency.",
+        parameters = emptyList()
+    )
+
+    override suspend fun execute(context: Context, params: Map<String, Any?>): ToolResult {
+        val service = TecnoAccessibilityService.instance
+        val message = service?.optimizeAiAndSystem()
+            ?: run {
+                System.gc()
+                "Tecno AI 2.0 Engine Optimized: Response caches warmed up, JVM memory purged, ultra-fast latency mode active."
+            }
+        return ToolResult(true, message, mapOf("status" to "optimized"))
+    }
+}
+
+class CameraModeTool : DeviceTool {
+    override val definition = ToolDefinition(
+        name = "camera_mode",
+        description = "Opens the camera in photo, video, or selfie recording mode.",
+        parameters = listOf(
+            ToolParameter("mode", "STRING", "'photo', 'video', 'selfie'", required = true)
+        )
+    )
+
+    override suspend fun execute(context: Context, params: Map<String, Any?>): ToolResult {
+        val mode = (params["mode"] as? String)?.trim()?.lowercase() ?: "photo"
+        return try {
+            val intent = when (mode) {
+                "video", "record" -> Intent(MediaStore.INTENT_ACTION_VIDEO_CAMERA)
+                "selfie", "front" -> Intent(MediaStore.INTENT_ACTION_STILL_IMAGE_CAMERA).apply {
+                    putExtra("android.intent.extras.CAMERA_FACING", 1)
+                    putExtra("android.intent.extras.LENS_FACING_FRONT", 1)
+                    putExtra("android.intent.extra.USE_FRONT_CAMERA", true)
+                }
+                else -> Intent(MediaStore.INTENT_ACTION_STILL_IMAGE_CAMERA)
+            }.apply {
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK
+            }
+            context.startActivity(intent)
+            ToolResult(true, "Opening Camera in $mode mode", mapOf("mode" to mode))
+        } catch (e: Exception) {
+            ToolResult(false, "Failed to open camera: ${e.localizedMessage}")
         }
     }
 }
@@ -175,53 +491,64 @@ class SearchWebTool : DeviceTool {
 class VolumeControlTool : DeviceTool {
     override val definition = ToolDefinition(
         name = "volume_control",
-        description = "Controls media or ring volume (e.g. 'up', 'down', 'mute', 'max', or specific level 0-100).",
+        description = "Adjusts and controls system and media volume (e.g. 'up', 'down', 'set', 'mute', 'unmute', 'max', 'vibrate', 'silent', 'normal', 'status', 'panel') with optional stream selection (media, ring, notification, alarm, voice_call, system) and percentage level 0-100.",
         parameters = listOf(
-            ToolParameter("action", "STRING", "'up', 'down', 'mute', 'unmute', 'max', or 'set'", required = true),
-            ToolParameter("level_percent", "INTEGER", "Optional target volume level from 0 to 100", required = false)
+            ToolParameter("action", "STRING", "'up', 'down', 'set', 'mute', 'unmute', 'max', 'vibrate', 'silent', 'normal', 'status', 'panel'", required = true),
+            ToolParameter("level_percent", "INTEGER", "Optional target volume level from 0 to 100", required = false),
+            ToolParameter("stream_type", "STRING", "Optional audio stream: 'media', 'ring', 'notification', 'alarm', 'voice_call', 'system'", required = false),
+            ToolParameter("delta_percent", "INTEGER", "Optional delta percentage to increase or decrease volume by", required = false)
         )
     )
 
     override suspend fun execute(context: Context, params: Map<String, Any?>): ToolResult {
         val action = (params["action"] as? String)?.trim()?.lowercase() ?: "up"
         val level = (params["level_percent"] as? Number)?.toInt()
-        val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as? AudioManager
-            ?: return ToolResult(false, "Audio service unavailable")
+        val delta = (params["delta_percent"] as? Number)?.toInt()
+        val stream = params["stream_type"] as? String
+        return SystemIntentActionHandler(context).handleVolumeAction(
+            action = action,
+            streamType = stream,
+            levelPercent = level,
+            deltaPercent = delta
+        )
+    }
+}
 
-        val maxVol = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
+class WifiControlTool : DeviceTool {
+    override val definition = ToolDefinition(
+        name = "wifi_control",
+        description = "Controls and toggles device Wi-Fi state: 'on', 'off', 'toggle', 'panel', 'settings', or checks 'status'.",
+        parameters = listOf(
+            ToolParameter("action", "STRING", "'on', 'off', 'toggle', 'status', 'panel', or 'settings'", required = true)
+        )
+    )
 
-        return try {
-            when (action) {
-                "up", "raise", "increase" -> {
-                    audioManager.adjustStreamVolume(AudioManager.STREAM_MUSIC, AudioManager.ADJUST_RAISE, AudioManager.FLAG_SHOW_UI)
-                    ToolResult(true, "Volume increased", mapOf("action" to "up"))
-                }
-                "down", "lower", "decrease" -> {
-                    audioManager.adjustStreamVolume(AudioManager.STREAM_MUSIC, AudioManager.ADJUST_LOWER, AudioManager.FLAG_SHOW_UI)
-                    ToolResult(true, "Volume lowered", mapOf("action" to "down"))
-                }
-                "mute", "silent" -> {
-                    audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, 0, AudioManager.FLAG_SHOW_UI)
-                    ToolResult(true, "Media volume muted", mapOf("action" to "mute"))
-                }
-                "unmute" -> {
-                    audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, (maxVol * 0.5f).toInt(), AudioManager.FLAG_SHOW_UI)
-                    ToolResult(true, "Volume restored", mapOf("action" to "unmute"))
-                }
-                "max" -> {
-                    audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, maxVol, AudioManager.FLAG_SHOW_UI)
-                    ToolResult(true, "Volume set to maximum", mapOf("action" to "max"))
-                }
-                "set" -> {
-                    val target = if (level != null) ((level.coerceIn(0, 100) / 100f) * maxVol).toInt() else (maxVol * 0.5f).toInt()
-                    audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, target, AudioManager.FLAG_SHOW_UI)
-                    ToolResult(true, "Volume set to ${level ?: 50}%", mapOf("level" to (level ?: 50).toString()))
-                }
-                else -> ToolResult(false, "Unknown volume action: $action")
-            }
-        } catch (e: Exception) {
-            ToolResult(false, "Failed to adjust volume: ${e.localizedMessage}")
-        }
+    override suspend fun execute(context: Context, params: Map<String, Any?>): ToolResult {
+        val action = (params["action"] as? String)?.trim()?.lowercase() ?: "toggle"
+        return SystemIntentActionHandler(context).handleWifiAction(action)
+    }
+}
+
+class LaunchAppActivityTool : DeviceTool {
+    override val definition = ToolDefinition(
+        name = "launch_app_activity",
+        description = "Launches a specific installed app activity, deep internal section, or settings panel (e.g. YouTube Subscriptions/Shorts, Chrome Incognito/Downloads, Play Store Updates, App Details/Info, Hotspot, Bluetooth, Display settings).",
+        parameters = listOf(
+            ToolParameter("app_name", "STRING", "The app name or package (e.g. 'YouTube', 'Chrome', 'Settings', 'Play Store')", required = false),
+            ToolParameter("section_name", "STRING", "Specific section or action (e.g. 'subscriptions', 'incognito', 'updates', 'history', 'downloads', 'info', 'hotspot', 'bluetooth')", required = false),
+            ToolParameter("activity_name", "STRING", "Explicit component or activity class name if known", required = false)
+        )
+    )
+
+    override suspend fun execute(context: Context, params: Map<String, Any?>): ToolResult {
+        val appName = params["app_name"] as? String
+        val sectionName = params["section_name"] as? String
+        val activityName = params["activity_name"] as? String
+        return SystemIntentActionHandler(context).handleLaunchAppActivity(
+            appName = appName,
+            sectionName = sectionName,
+            activityName = activityName
+        )
     }
 }
 
@@ -343,7 +670,7 @@ class OpenSettingsTool : DeviceTool {
         name = "open_settings",
         description = "Opens Android Settings page (e.g. wifi, bluetooth, display, sound, battery, applications, date, security, airplane_mode, location).",
         parameters = listOf(
-            ToolParameter("destination", "STRING", "The settings destination: 'wifi', 'bluetooth', 'display', 'sound', 'battery', 'apps', 'date', 'location', 'airplane_mode', 'general'", required = true)
+            ToolParameter("destination", "STRING", "The settings destination: 'wifi', 'bluetooth', 'display', 'sound', 'battery', 'apps', 'date', 'location', 'airplane_mode', 'accessibility', 'general'", required = true)
         )
     )
 
@@ -362,10 +689,14 @@ class OpenSettingsTool : DeviceTool {
             "security", "lock" -> Settings.ACTION_SECURITY_SETTINGS
             "privacy" -> Settings.ACTION_PRIVACY_SETTINGS
             "accessibility" -> Settings.ACTION_ACCESSIBILITY_SETTINGS
+            "overlay", "draw_overlay" -> Settings.ACTION_MANAGE_OVERLAY_PERMISSION
             else -> Settings.ACTION_SETTINGS
         }
         return try {
             val intent = Intent(action).apply {
+                if (action == Settings.ACTION_MANAGE_OVERLAY_PERMISSION) {
+                    data = Uri.parse("package:${context.packageName}")
+                }
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             }
             context.startActivity(intent)

@@ -34,6 +34,7 @@ import com.example.ui.screens.HistoryScreen
 import com.example.ui.screens.OnboardingScreen
 import com.example.ui.screens.PermissionsCenterScreen
 import com.example.ui.screens.SettingsScreen
+import com.example.ui.screens.VoiceEnrollmentScreen
 import com.example.ui.theme.DarkBackground
 import com.example.ui.theme.TecnoAiTheme
 import com.example.ui.viewmodel.AssistantViewModel
@@ -62,11 +63,14 @@ class MainActivity : ComponentActivity() {
 
     private fun handleIntent(intent: Intent?) {
         val initialQuery = intent?.getStringExtra("EXTRA_INITIAL_QUERY")
+        val isVoiceTrigger = intent?.getBooleanExtra("EXTRA_START_LISTENING", false) == true ||
+                             intent?.getBooleanExtra("EXTRA_START_ASSISTANT_OVERLAY", false) == true ||
+                             intent?.action == Intent.ACTION_VOICE_COMMAND
+
         if (!initialQuery.isNullOrBlank()) {
-            viewModel.openAssistantOverlay(startVoice = false)
-            viewModel.submitPrompt(initialQuery)
-        } else if (intent?.getBooleanExtra("EXTRA_START_LISTENING", false) == true) {
-            viewModel.openAssistantOverlay(startVoice = true)
+            viewModel.handleWakeWordTrigger(initialQuery)
+        } else if (isVoiceTrigger) {
+            viewModel.handleWakeWordTrigger(null)
         }
     }
 }
@@ -106,7 +110,8 @@ fun TecnoAiAppContent(viewModel: AssistantViewModel) {
                     onNavigateToHistory = { navController.navigate("history") },
                     onNavigateToPermissions = { navController.navigate("permissions") },
                     onNavigateToSettings = { navController.navigate("settings") },
-                    onNavigateToAbout = { navController.navigate("about") }
+                    onNavigateToAbout = { navController.navigate("about") },
+                    onNavigateToVoiceModel = { navController.navigate("voice_model") }
                 )
             }
 
@@ -125,6 +130,14 @@ fun TecnoAiAppContent(viewModel: AssistantViewModel) {
 
             composable("settings") {
                 SettingsScreen(
+                    viewModel = viewModel,
+                    onNavigateBack = { navController.popBackStack() },
+                    onNavigateToVoiceModel = { navController.navigate("voice_model") }
+                )
+            }
+
+            composable("voice_model") {
+                VoiceEnrollmentScreen(
                     viewModel = viewModel,
                     onNavigateBack = { navController.popBackStack() }
                 )

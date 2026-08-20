@@ -6,6 +6,7 @@ import android.content.Intent
 import android.os.Build
 import android.os.VibrationEffect
 import android.os.Vibrator
+import android.provider.Settings
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
@@ -16,6 +17,8 @@ import com.example.assistant.IntentRouter
 import com.example.data.local.ConversationEntity
 import com.example.data.local.UserSettings
 import com.example.data.repository.AssistantRepository
+import com.example.overlay.FloatingOverlayService
+import com.example.speech.AudioVolumeMeterHelper
 import com.example.speech.SoundCueHelper
 import com.example.speech.SpeechRecognizerHelper
 import com.example.speech.SpeechState
@@ -60,6 +63,12 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
     val textToSpeechHelper = TextToSpeechHelper(application)
     val soundCueHelper = SoundCueHelper()
     val authManager = com.example.auth.AuthManager(application)
+    val audioVolumeMeterHelper = AudioVolumeMeterHelper(application)
+    val voiceRecognitionModel = com.example.speech.VoiceRecognitionModel(application)
+    val voiceTrainer = com.example.speech.VoiceRecognitionTrainer(application, voiceRecognitionModel)
+
+    val voiceProfile: StateFlow<com.example.speech.VoiceProfileData> = voiceRecognitionModel.voiceProfileFlow
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), com.example.speech.VoiceProfileData())
 
     val conversationHistory: StateFlow<List<ConversationEntity>> = repository.messagesFlow
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
@@ -83,10 +92,12 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
     val isOverlayVisible: StateFlow<Boolean> = _isOverlayVisible.asStateFlow()
 
     init {
-        // Apply saved voice profile whenever settings change
+        // Apply saved voice profile & mic gain whenever settings change
         viewModelScope.launch {
             userSettings.collect { settings ->
                 textToSpeechHelper.setVoiceProfile(settings.voiceId)
+                speechRecognizerHelper.sensitivityGain = settings.micSensitivityGain
+                speechRecognizerHelper.preferredLanguage = settings.speechLanguage
             }
         }
 
@@ -121,11 +132,29 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
         }
     }
 
-    fun openAssistantOverlay(startVoice: Boolean = false) {
+    fun openAssistantOverlay(startVoice: Boolean = false, speakGreeting: Boolean = false) {
         _isOverlayVisible.value = true
         _statusMessage.value = null
         playActivationEarcon()
-        if (startVoice) {
+        if (speakGreeting) {
+            val greeting = "How can I help you?"
+            _liveTranscript.value = greeting
+            speakIfEnabled(greeting)
+            startVoiceInput()
+        } else if (startVoice) {
+            startVoiceInput()
+        }
+    }
+
+    fun handleWakeWordTrigger(initialQuery: String?) {
+        _isOverlayVisible.value = true
+        playActivationEarcon()
+        if (!initialQuery.isNullOrBlank()) {
+            submitPrompt(initialQuery)
+        } else {
+            val greeting = "How can I help you?"
+            _statusMessage.value = greeting
+            speakIfEnabled(greeting)
             startVoiceInput()
         }
     }
@@ -146,7 +175,8 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
         _uiState.value = AssistantUiState.LISTENING
         _liveTranscript.value = ""
 
-        speechRecognizerHelper.startListening { transcribedText ->
+        val currentGain = userSettings.value.micSensitivityGain
+        speechRecognizerHelper.startListening(gain = currentGain) { transcribedText ->
             if (transcribedText.isNotBlank()) {
                 submitPrompt(transcribedText)
             }
@@ -189,7 +219,6 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
             when (decision.type) {
                 DecisionType.LOCAL_ACTION -> {
                     if (decision.directAnswer != null) {
-                        // Immediate direct answer (such as Owner = Tecnolegend)
                         repository.addMessage(role = "ASSISTANT", content = decision.directAnswer)
                         _statusMessage.value = decision.directAnswer
                         _uiState.value = AssistantUiState.SUCCESS
@@ -217,11 +246,12 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
                         val desc = when (toolName) {
                             "call_contact" -> "Call ${decision.parameters["contact_name_or_number"]}?"
                             "prepare_message" -> "Send SMS to ${decision.parameters["contact_name_or_number"]} with text: \"${decision.parameters["message"]}\"?"
+                            "whatsapp_send" -> "Send WhatsApp message to ${decision.parameters["phone_or_contact"]} with text: \"${decision.parameters["message"]}\"?"
                             else -> "Execute $toolName?"
                         }
                         val msgId = repository.addMessage(
                             role = "ASSISTANT",
-                            content = "I need your confirmation to proceed with this sensitive action.",
+                            content = "I need your confirmation to proceed with this action.",
                             toolName = toolName,
                             toolParams = decision.parameters.toString(),
                             requiresConfirmation = true
@@ -254,19 +284,18 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
                 }
 
                 DecisionType.AI_QUESTION, DecisionType.WEB_SEARCH, DecisionType.UNSUPPORTED -> {
-                    // Deep Gemini AI Consultation & Web Searching
                     _uiState.value = AssistantUiState.THINKING
-                    _statusMessage.value = "Consulting Gemini AI..."
+                    _statusMessage.value = "Tecno AI Processing..."
 
                     val history = repository.getRecentMessages(6).map { it.role to it.content }
                     val aiResult = geminiClient.processRequest(
                         userPrompt = prompt,
                         conversationHistory = history,
-                        model = userSettings.value.selectedModel
+                        model = userSettings.value.selectedModel,
+                        context = app
                     )
 
                     if (aiResult.toolCallName != null) {
-                        // Gemini returned a function/tool call
                         _uiState.value = AssistantUiState.EXECUTING
                         _statusMessage.value = "Executing ${aiResult.toolCallName}..."
                         val toolResult = toolDispatcher.executeTool(
@@ -277,7 +306,6 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
                         )
                         handleToolResult(prompt, aiResult.toolCallName, aiResult.toolCallParams ?: emptyMap(), toolResult)
                     } else {
-                        // AI Answer with search sources if any
                         val sourcesStr = if (aiResult.searchSources.isNotEmpty()) {
                             aiResult.searchSources.joinToString(" | ") { "${it.first} (${it.second})" }
                         } else null
@@ -424,9 +452,39 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
                 } else {
                     app.stopService(serviceIntent)
                 }
-            } catch (e: Exception) {
-                // Ignore failure if background permissions are pending
-            }
+            } catch (e: Exception) {}
+        }
+    }
+
+    fun updateOverlayBubbleEnabled(enabled: Boolean) {
+        viewModelScope.launch {
+            repository.updateSettings { it.setOverlayBubbleEnabled(enabled) }
+            try {
+                val serviceIntent = Intent(app, FloatingOverlayService::class.java)
+                if (enabled && Settings.canDrawOverlays(app)) {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                        ContextCompat.startForegroundService(app, serviceIntent)
+                    } else {
+                        app.startService(serviceIntent)
+                    }
+                } else {
+                    app.stopService(serviceIntent)
+                }
+            } catch (e: Exception) {}
+        }
+    }
+
+    fun updateMicSensitivityGain(gain: Float) {
+        speechRecognizerHelper.sensitivityGain = gain
+        viewModelScope.launch {
+            repository.updateSettings { it.setMicSensitivityGain(gain) }
+        }
+    }
+
+    fun updateSpeechLanguage(lang: String) {
+        speechRecognizerHelper.preferredLanguage = lang
+        viewModelScope.launch {
+            repository.updateSettings { it.setSpeechLanguage(lang) }
         }
     }
 
@@ -467,9 +525,34 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
         viewModelScope.launch { repository.updateSettings { it.setOnboardingCompleted(true) } }
     }
 
+    fun updateApiKey(index: Int, key: String) {
+        viewModelScope.launch { repository.updateSettings { it.setApiKey(index, key) } }
+    }
+
+    fun updateAutoListenOnOpen(enabled: Boolean) {
+        viewModelScope.launch { repository.updateSettings { it.setAutoListenOnOpen(enabled) } }
+    }
+
+    fun startVoiceTest(speakerName: String) {
+        voiceTrainer.startVoiceTest(speakerName)
+    }
+
+    fun resetVoiceTrainer() {
+        voiceTrainer.resetTest()
+    }
+
+    fun resetEnrolledVoice() {
+        viewModelScope.launch {
+            voiceRecognitionModel.resetVoiceProfile()
+            voiceTrainer.resetTest()
+        }
+    }
+
     override fun onCleared() {
         speechRecognizerHelper.stopListening()
         textToSpeechHelper.shutdown()
+        audioVolumeMeterHelper.stopMetering()
+        voiceTrainer.resetTest()
         super.onCleared()
     }
 }

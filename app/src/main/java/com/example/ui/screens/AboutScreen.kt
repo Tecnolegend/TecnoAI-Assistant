@@ -190,7 +190,7 @@ fun AboutScreen(
                 ) {
                     Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
                         FeatureRow("Ultra-Fast Device Superpowers", "Controls volume, battery, device specs, timer, flashlight, Wi-Fi, apps, and phone calls instantly.")
-                        FeatureRow("Gemini AI Consulting & Search", "Deep reasoning and intelligent web searching powered by Google Gemini AI.")
+                        FeatureRow("Tecno Neural AI Consulting & Vision", "Deep reasoning, in-app screen perception, and fast answers powered by Tecno AI.")
                         FeatureRow("Siri-Style Bottom Wave", "Fluid crimson gradient bottom sheet that springs up instantly upon activation.")
                         FeatureRow("Multi-Voice Synthesis (7 Voices)", "Select from 7 distinct AI voices and customized acoustic activation chimes.")
                         FeatureRow("Continuous \"Hey Tecno\" Wake Word", "Background acoustic detector listens for the wake phrase with configurable sensitivity.")

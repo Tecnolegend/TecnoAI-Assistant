@@ -1,3 +1,4 @@
 <resources>
     <string name="app_name">Tecno AI</string>
+    <string name="accessibility_service_description">Enables Tecno AI to automate app navigation, perform gestures (Back, Home, Recents, Notifications), and interact seamlessly with apps on your device.</string>
 </resources>
