@@ -3,7 +3,10 @@ package com.example
 import android.content.Context
 import androidx.test.core.app.ApplicationProvider
 import com.example.assistant.IntentRouter
+import com.example.data.local.UserSettingsManager
 import com.example.tools.ToolRegistry
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
@@ -54,5 +57,19 @@ class ExampleRobolectricTest {
         assertNotNull(flashlight)
         assertEquals("toggle_flashlight", flashlight?.name)
         assertEquals(true, flashlight?.parameters?.get("enabled"))
+    }
+
+    @Test
+    fun testUserSettingsDataStorePersistence() = runBlocking {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val settingsManager = UserSettingsManager(context)
+
+        settingsManager.setWakeWordEnabled(false)
+        val updated = settingsManager.userSettingsFlow.first()
+        assertEquals(false, updated.isWakeWordEnabled)
+
+        settingsManager.setWakeWordEnabled(true)
+        val reEnabled = settingsManager.userSettingsFlow.first()
+        assertEquals(true, reEnabled.isWakeWordEnabled)
     }
 }

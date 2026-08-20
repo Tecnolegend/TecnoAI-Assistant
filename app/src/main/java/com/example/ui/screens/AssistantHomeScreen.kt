@@ -41,6 +41,8 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
@@ -213,28 +215,58 @@ fun AssistantHomeScreen(
 
                         Spacer(modifier = Modifier.height(12.dp))
 
-                        // Wake word status badge
+                        // Wake word status & persistent toggle switch
                         Surface(
-                            shape = RoundedCornerShape(12.dp),
+                            shape = RoundedCornerShape(16.dp),
                             color = if (userSettings.isWakeWordEnabled) CrimsonSubtle else DarkSurfaceElevated,
-                            border = androidx.compose.foundation.BorderStroke(1.dp, if (userSettings.isWakeWordEnabled) CrimsonDark else DarkBorder)
+                            border = androidx.compose.foundation.BorderStroke(1.dp, if (userSettings.isWakeWordEnabled) CrimsonDark else DarkBorder),
+                            modifier = Modifier.fillMaxWidth().padding(top = 8.dp)
                         ) {
                             Row(
-                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 14.dp, vertical = 8.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Box(
-                                    modifier = Modifier
-                                        .size(7.dp)
-                                        .clip(CircleShape)
-                                        .background(if (userSettings.isWakeWordEnabled) SuccessGreen else TextMuted)
-                                )
-                                Spacer(modifier = Modifier.width(6.dp))
-                                Text(
-                                    text = if (userSettings.isWakeWordEnabled) "Wake Word Ready" else "Manual Activation",
-                                    fontSize = 11.sp,
-                                    color = TextSecondary,
-                                    fontWeight = FontWeight.Medium
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(8.dp)
+                                            .clip(CircleShape)
+                                            .background(if (userSettings.isWakeWordEnabled) SuccessGreen else TextMuted)
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Column {
+                                        Text(
+                                            text = if (userSettings.isWakeWordEnabled) "\"Hey Tecno\" Active" else "Wake Word Disabled",
+                                            fontSize = 12.sp,
+                                            color = TextPrimary,
+                                            fontWeight = FontWeight.SemiBold
+                                        )
+                                        Text(
+                                            text = if (userSettings.isWakeWordEnabled) "Background service listening" else "Tap switch to enable",
+                                            fontSize = 10.sp,
+                                            color = TextSecondary
+                                        )
+                                    }
+                                }
+
+                                Switch(
+                                    checked = userSettings.isWakeWordEnabled,
+                                    onCheckedChange = { enabled ->
+                                        viewModel.updateWakeWordEnabled(enabled)
+                                    },
+                                    colors = SwitchDefaults.colors(
+                                        checkedThumbColor = Color.White,
+                                        checkedTrackColor = CrimsonBright,
+                                        uncheckedThumbColor = TextMuted,
+                                        uncheckedTrackColor = DarkBorder
+                                    ),
+                                    modifier = Modifier.testTag("home_wake_word_switch")
                                 )
                             }
                         }

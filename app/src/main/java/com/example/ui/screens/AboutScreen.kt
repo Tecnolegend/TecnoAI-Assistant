@@ -17,11 +17,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
-import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.Code
-import androidx.compose.material.icons.filled.Lock
-import androidx.compose.material.icons.filled.Security
-import androidx.compose.material.icons.filled.Speed
+import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Psychology
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -51,7 +48,6 @@ import com.example.ui.theme.DarkBorder
 import com.example.ui.theme.DarkSurface
 import com.example.ui.theme.DarkSurfaceElevated
 import com.example.ui.theme.DarkSurfaceVariant
-import com.example.ui.theme.SuccessGreen
 import com.example.ui.theme.TextAccent
 import com.example.ui.theme.TextMuted
 import com.example.ui.theme.TextPrimary
@@ -89,7 +85,7 @@ fun AboutScreen(
             item {
                 Card(
                     colors = CardDefaults.cardColors(containerColor = DarkSurfaceElevated),
-                    border = CardDefaults.outlinedCardBorder().copy(brush = Brush.verticalGradient(listOf(CrimsonDark, DarkBorder))),
+                    border = CardDefaults.outlinedCardBorder().copy(brush = Brush.verticalGradient(listOf(CrimsonBright, CrimsonDark))),
                     shape = RoundedCornerShape(20.dp),
                     modifier = Modifier.fillMaxWidth().padding(top = 8.dp)
                 ) {
@@ -113,19 +109,28 @@ fun AboutScreen(
 
                         Text(
                             text = "TECNO AI",
-                            fontSize = 20.sp,
+                            fontSize = 22.sp,
                             fontWeight = FontWeight.Black,
                             letterSpacing = 2.sp,
                             color = TextPrimary
                         )
 
                         Text(
-                            text = "Version 1.0.0 (Production Release)",
-                            fontSize = 12.sp,
+                            text = "Created & Owned by Tecnolegend",
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = CrimsonBright
+                        )
+
+                        Spacer(modifier = Modifier.height(6.dp))
+
+                        Text(
+                            text = "Version 1.0.0 (Production)",
+                            fontSize = 11.sp,
                             color = TextMuted
                         )
 
-                        Spacer(modifier = Modifier.height(8.dp))
+                        Spacer(modifier = Modifier.height(10.dp))
 
                         Text(
                             text = "\"Say it. Tecno handles it.\"",
@@ -133,6 +138,40 @@ fun AboutScreen(
                             fontWeight = FontWeight.Medium,
                             color = TextAccent
                         )
+                    }
+                }
+            }
+
+            // Owner Profile Card
+            item {
+                Text("CREATOR & OWNERSHIP", fontSize = 12.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.2.sp, color = TextMuted)
+            }
+
+            item {
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = DarkSurface),
+                    border = CardDefaults.outlinedCardBorder().copy(brush = Brush.horizontalGradient(listOf(CrimsonDark, DarkBorder))),
+                    shape = RoundedCornerShape(16.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        modifier = Modifier.padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(44.dp)
+                                .clip(CircleShape)
+                                .background(CrimsonSubtle),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(Icons.Default.Person, contentDescription = null, tint = CrimsonBright, modifier = Modifier.size(26.dp))
+                        }
+                        Spacer(modifier = Modifier.width(14.dp))
+                        Column {
+                            Text("Owner: Tecnolegend", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
+                            Text("Architect & Creator of the Tecno AI Assistant ecosystem", fontSize = 12.sp, color = TextSecondary)
+                        }
                     }
                 }
             }
@@ -150,17 +189,18 @@ fun AboutScreen(
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                        FeatureRow("Offline-First Device Actions", "Executes alarms, timers, app launches, and system settings instantly on-device without cloud latency.")
-                        FeatureRow("Gemini Multi-Turn Intelligence", "Routes complex reasoning, web searches, and summaries through Google Gemini API models.")
-                        FeatureRow("Local Room Database", "Stores conversation history and user settings safely in an SQLite Room database on your device.")
-                        FeatureRow("Acoustic Wake-Word Detector", "Low-power continuous wake-word detector triggers the assistant with the \"Hey Tecno\" voice cue.")
+                        FeatureRow("Ultra-Fast Device Superpowers", "Controls volume, battery, device specs, timer, flashlight, Wi-Fi, apps, and phone calls instantly.")
+                        FeatureRow("Gemini AI Consulting & Search", "Deep reasoning and intelligent web searching powered by Google Gemini AI.")
+                        FeatureRow("Siri-Style Bottom Wave", "Fluid crimson gradient bottom sheet that springs up instantly upon activation.")
+                        FeatureRow("Multi-Voice Synthesis (7 Voices)", "Select from 7 distinct AI voices and customized acoustic activation chimes.")
+                        FeatureRow("Continuous \"Hey Tecno\" Wake Word", "Background acoustic detector listens for the wake phrase with configurable sensitivity.")
                     }
                 }
             }
 
             // Security & Privacy
             item {
-                Text("SAFETY & PRIVACY", fontSize = 12.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.2.sp, color = TextMuted)
+                Text("SAFETY & PERMISSIONS", fontSize = 12.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.2.sp, color = TextMuted)
             }
 
             item {
@@ -172,13 +212,13 @@ fun AboutScreen(
                 ) {
                     Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                         Text(
-                            text = "Confirmation on Sensitive Actions",
+                            text = "Explicit Confirmation for Sensitive Actions",
                             fontSize = 14.sp,
                             fontWeight = FontWeight.Bold,
                             color = TextPrimary
                         )
                         Text(
-                            text = "Actions that affect your communications or cost (such as calling contacts or sending SMS) always require explicit user confirmation before execution.",
+                            text = "Actions that initiate phone calls or send messages prompt for your one-tap approval before dispatching.",
                             fontSize = 12.sp,
                             color = TextSecondary
                         )

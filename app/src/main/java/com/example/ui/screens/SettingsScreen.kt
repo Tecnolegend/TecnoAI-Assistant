@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.Intent
 import android.os.Build
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -16,6 +17,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -26,16 +28,22 @@ import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.Memory
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Psychology
+import androidx.compose.material.icons.filled.RecordVoiceOver
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.filled.Vibration
 import androidx.compose.material.icons.filled.VolumeUp
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
@@ -43,12 +51,12 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
-import kotlinx.coroutines.launch
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -61,6 +69,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.ai.GeminiNetworkClient
+import com.example.speech.SoundCueHelper
+import com.example.speech.VoicePresets
 import com.example.tools.ToolRegistry
 import com.example.ui.theme.CrimsonBright
 import com.example.ui.theme.CrimsonDark
@@ -77,8 +87,8 @@ import com.example.ui.theme.TextMuted
 import com.example.ui.theme.TextPrimary
 import com.example.ui.theme.TextSecondary
 import com.example.ui.viewmodel.AssistantViewModel
-import com.example.wakeword.WakeWordService
 import com.google.firebase.auth.FirebaseAuth
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -90,17 +100,26 @@ fun SettingsScreen(
     val context = LocalContext.current
     val settings by viewModel.userSettings.collectAsState()
     val authUser = rememberUserAuth()
+    val coroutineScope = rememberCoroutineScope()
 
     val models = listOf(
-        "gemini-3.5-flash" to "Gemini 3.5 Flash (Recommended - Fastest)",
-        "gemini-3.1-pro-preview" to "Gemini 3.1 Pro (Complex Reasoning)",
+        "gemini-3.5-flash" to "Gemini 3.5 Flash (Recommended - Ultra Fast)",
+        "gemini-3.1-pro-preview" to "Gemini 3.1 Pro (Deep AI Consulting)",
         "gemini-3.1-flash-lite-preview" to "Gemini 3.1 Flash Lite (Low Latency)"
+    )
+
+    val soundThemes = listOf(
+        SoundCueHelper.SoundTheme.CRIMSON_CYBER,
+        SoundCueHelper.SoundTheme.NEURAL_PULSE,
+        SoundCueHelper.SoundTheme.HYPER_ASCENT,
+        SoundCueHelper.SoundTheme.MINIMAL_POP,
+        SoundCueHelper.SoundTheme.MUTE
     )
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Settings & Preferences", fontWeight = FontWeight.Bold, fontSize = 18.sp, color = TextPrimary) },
+                title = { Text("Settings & Superpowers", fontWeight = FontWeight.Bold, fontSize = 18.sp, color = TextPrimary) },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack, modifier = Modifier.testTag("settings_back_button")) {
                         Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = TextPrimary)
@@ -119,7 +138,45 @@ fun SettingsScreen(
                 .padding(horizontal = 20.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // Voice & Wake Word Section
+            // About & Owner Card
+            item {
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = DarkSurfaceElevated),
+                    border = CardDefaults.outlinedCardBorder().copy(
+                        brush = Brush.horizontalGradient(listOf(CrimsonBright, CrimsonDark))
+                    ),
+                    shape = RoundedCornerShape(18.dp),
+                    modifier = Modifier.fillMaxWidth().testTag("owner_info_card")
+                ) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Box(
+                                modifier = Modifier
+                                    .size(38.dp)
+                                    .clip(CircleShape)
+                                    .background(CrimsonSubtle),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(Icons.Default.Psychology, contentDescription = null, tint = CrimsonBright, modifier = Modifier.size(22.dp))
+                            }
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Column {
+                                Text("TECNO AI", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
+                                Text("Owner & Creator: Tecnolegend", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = CrimsonBright)
+                            }
+                        }
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = "Next-gen intelligent mobile assistant with full Android device powers, instant local execution, Siri-style bottom activation, and deep Gemini AI consultation.",
+                            fontSize = 12.sp,
+                            color = TextSecondary,
+                            lineHeight = 16.sp
+                        )
+                    }
+                }
+            }
+
+            // Voice & Activation Section
             item {
                 SettingsSectionHeader(title = "VOICE & ACTIVATION")
             }
@@ -133,16 +190,6 @@ fun SettingsScreen(
                         checked = settings.isWakeWordEnabled,
                         onCheckedChange = { enabled ->
                             viewModel.updateWakeWordEnabled(enabled)
-                            val serviceIntent = Intent(context, WakeWordService::class.java)
-                            if (enabled) {
-                                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                                    context.startForegroundService(serviceIntent)
-                                } else {
-                                    context.startService(serviceIntent)
-                                }
-                            } else {
-                                context.stopService(serviceIntent)
-                            }
                         },
                         tag = "toggle_wake_word"
                     )
@@ -192,9 +239,149 @@ fun SettingsScreen(
                 }
             }
 
-            // Security & Permissions Section
+            // Custom Voice Profiles Selection
             item {
-                SettingsSectionHeader(title = "SECURITY & SAFETY")
+                SettingsSectionHeader(title = "AI VOICE PROFILES (7 VOICES)")
+            }
+
+            item {
+                SettingsCard {
+                    VoicePresets.allVoices.forEach { voice ->
+                        val isSelected = settings.voiceId == voice.id
+                        Surface(
+                            onClick = { viewModel.updateVoiceId(voice.id) },
+                            shape = RoundedCornerShape(12.dp),
+                            color = if (isSelected) CrimsonSubtle else DarkSurface,
+                            border = androidx.compose.foundation.BorderStroke(
+                                1.dp,
+                                if (isSelected) CrimsonBright else DarkBorder
+                            ),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 3.dp)
+                                .testTag("voice_option_${voice.id}")
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Text(
+                                            text = voice.name,
+                                            fontSize = 14.sp,
+                                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.SemiBold,
+                                            color = if (isSelected) TextPrimary else TextSecondary
+                                        )
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Surface(
+                                            shape = RoundedCornerShape(4.dp),
+                                            color = DarkSurfaceElevated
+                                        ) {
+                                            Text(
+                                                text = voice.gender,
+                                                fontSize = 10.sp,
+                                                color = CrimsonBright,
+                                                modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
+                                            )
+                                        }
+                                    }
+                                    Text(
+                                        text = voice.description,
+                                        fontSize = 11.sp,
+                                        color = TextMuted
+                                    )
+                                }
+
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    IconButton(
+                                        onClick = {
+                                            viewModel.textToSpeechHelper.setVoiceProfile(voice.id)
+                                            viewModel.textToSpeechHelper.speak("Hello, I am ${voice.name}, powered by Tecno AI.")
+                                        },
+                                        modifier = Modifier.size(32.dp).testTag("preview_voice_${voice.id}")
+                                    ) {
+                                        Icon(Icons.Default.PlayArrow, contentDescription = "Preview voice", tint = CrimsonBright)
+                                    }
+
+                                    if (isSelected) {
+                                        Icon(
+                                            Icons.Default.Check,
+                                            contentDescription = "Selected",
+                                            tint = CrimsonBright,
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Sound Activation Chime Selection
+            item {
+                SettingsSectionHeader(title = "ACTIVATION SOUND CHIMES")
+            }
+
+            item {
+                SettingsCard {
+                    soundThemes.forEach { soundTheme ->
+                        val isSelected = settings.soundTheme == soundTheme.name
+                        Surface(
+                            onClick = {
+                                viewModel.updateSoundTheme(soundTheme.name)
+                                viewModel.soundCueHelper.playActivationSound(soundTheme)
+                            },
+                            shape = RoundedCornerShape(12.dp),
+                            color = if (isSelected) CrimsonSubtle else DarkSurface,
+                            border = androidx.compose.foundation.BorderStroke(
+                                1.dp,
+                                if (isSelected) CrimsonBright else DarkBorder
+                            ),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 3.dp)
+                                .testTag("sound_theme_${soundTheme.name}")
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = soundTheme.displayName,
+                                    fontSize = 13.sp,
+                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                    color = if (isSelected) TextPrimary else TextSecondary
+                                )
+
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    IconButton(
+                                        onClick = { viewModel.soundCueHelper.playActivationSound(soundTheme) },
+                                        modifier = Modifier.size(32.dp)
+                                    ) {
+                                        Icon(Icons.Default.GraphicEq, contentDescription = "Play sound", tint = CrimsonBright)
+                                    }
+                                    if (isSelected) {
+                                        Icon(
+                                            Icons.Default.Check,
+                                            contentDescription = "Selected",
+                                            tint = CrimsonBright,
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Security & Safety Section
+            item {
+                SettingsSectionHeader(title = "SECURITY & PERMISSIONS")
             }
 
             item {
@@ -212,7 +399,7 @@ fun SettingsScreen(
 
             // Gemini Model Selection
             item {
-                SettingsSectionHeader(title = "AI INTELLIGENCE MODEL")
+                SettingsSectionHeader(title = "AI INTELLIGENCE & CONSULTING MODEL")
             }
 
             item {
@@ -267,7 +454,6 @@ fun SettingsScreen(
             item {
                 val authState by viewModel.authManager.authState.collectAsState()
                 val activity = context as? android.app.Activity
-                val coroutineScope = androidx.compose.runtime.rememberCoroutineScope()
 
                 SettingsCard {
                     when (val state = authState) {
@@ -322,14 +508,14 @@ fun SettingsScreen(
 
                             Spacer(modifier = Modifier.height(14.dp))
 
-                            androidx.compose.material3.OutlinedButton(
+                            OutlinedButton(
                                 onClick = {
                                     coroutineScope.launch {
                                         viewModel.authManager.signOut()
                                     }
                                 },
                                 shape = RoundedCornerShape(10.dp),
-                                colors = androidx.compose.material3.ButtonDefaults.outlinedButtonColors(contentColor = TextSecondary),
+                                colors = ButtonDefaults.outlinedButtonColors(contentColor = TextSecondary),
                                 modifier = Modifier.fillMaxWidth().testTag("sign_out_button")
                             ) {
                                 Text("Sign Out of Google", fontSize = 13.sp)
@@ -342,7 +528,7 @@ fun SettingsScreen(
                                 horizontalArrangement = Arrangement.Center,
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                androidx.compose.material3.CircularProgressIndicator(
+                                CircularProgressIndicator(
                                     modifier = Modifier.size(24.dp),
                                     color = CrimsonBright,
                                     strokeWidth = 2.dp
@@ -390,7 +576,7 @@ fun SettingsScreen(
 
                                 Spacer(modifier = Modifier.height(14.dp))
 
-                                androidx.compose.material3.Button(
+                                Button(
                                     onClick = {
                                         if (activity != null) {
                                             coroutineScope.launch {
@@ -398,7 +584,7 @@ fun SettingsScreen(
                                             }
                                         }
                                     },
-                                    colors = androidx.compose.material3.ButtonDefaults.buttonColors(containerColor = CrimsonBright),
+                                    colors = ButtonDefaults.buttonColors(containerColor = CrimsonBright),
                                     shape = RoundedCornerShape(12.dp),
                                     modifier = Modifier.fillMaxWidth().testTag("google_sign_in_button")
                                 ) {
@@ -412,7 +598,7 @@ fun SettingsScreen(
 
             // System Diagnostics
             item {
-                SettingsSectionHeader(title = "DIAGNOSTICS & SYSTEM STATUS")
+                SettingsSectionHeader(title = "DIAGNOSTICS & SYSTEM POWERS")
             }
 
             item {
@@ -420,13 +606,13 @@ fun SettingsScreen(
                     val apiKey = GeminiNetworkClient.getApiKey()
                     val hasKey = apiKey.isNotBlank() && apiKey != "MY_GEMINI_API_KEY"
 
-                    DiagnosticRow("Registered Local Tools", "${ToolRegistry.allTools.size} Tools Ready")
+                    DiagnosticRow("Registered Mobile Powers", "${ToolRegistry.allTools.size} Powers Active")
                     Spacer(modifier = Modifier.height(8.dp))
-                    DiagnosticRow("Gemini API Key Status", if (hasKey) "Configured (AI Online)" else "Using Offline/Fallback Mode")
+                    DiagnosticRow("Owner & Developer", "Tecnolegend")
                     Spacer(modifier = Modifier.height(8.dp))
-                    DiagnosticRow("Speech Recognition Engine", if (viewModel.speechRecognizerHelper.isRecognitionAvailable()) "Available" else "Unavailable")
+                    DiagnosticRow("Gemini AI Intelligence", if (hasKey) "Online & Connected" else "Direct Tool Mode")
                     Spacer(modifier = Modifier.height(8.dp))
-                    DiagnosticRow("Wake Word Service", if (settings.isWakeWordEnabled) "Foreground Active" else "Disabled")
+                    DiagnosticRow("Wake Word Service", if (settings.isWakeWordEnabled) "Background Listening Active" else "Disabled")
                 }
             }
 

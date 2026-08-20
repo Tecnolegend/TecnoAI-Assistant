@@ -20,7 +20,10 @@ data class UserSettings(
     val wakeWordSensitivity: Float = 0.5f,
     val hasCompletedOnboarding: Boolean = false,
     val autoCloseOverlayOnSuccess: Boolean = false,
-    val userCustomName: String = "User"
+    val userCustomName: String = "User",
+    val voiceId: String = "tecno_crimson",
+    val soundTheme: String = "CRIMSON_CYBER",
+    val isSiriBottomStyle: Boolean = true
 )
 
 class UserSettingsManager(private val context: Context) {
@@ -34,6 +37,9 @@ class UserSettingsManager(private val context: Context) {
         val KEY_ONBOARDING = booleanPreferencesKey("has_completed_onboarding")
         val KEY_AUTO_CLOSE = booleanPreferencesKey("auto_close_overlay")
         val KEY_USER_NAME = stringPreferencesKey("user_custom_name")
+        val KEY_VOICE_ID = stringPreferencesKey("voice_id")
+        val KEY_SOUND_THEME = stringPreferencesKey("sound_theme")
+        val KEY_SIRI_STYLE = booleanPreferencesKey("siri_bottom_style")
     }
 
     val userSettingsFlow: Flow<UserSettings> = context.dataStore.data.map { preferences ->
@@ -46,7 +52,10 @@ class UserSettingsManager(private val context: Context) {
             wakeWordSensitivity = preferences[KEY_SENSITIVITY] ?: 0.5f,
             hasCompletedOnboarding = preferences[KEY_ONBOARDING] ?: false,
             autoCloseOverlayOnSuccess = preferences[KEY_AUTO_CLOSE] ?: false,
-            userCustomName = preferences[KEY_USER_NAME] ?: "User"
+            userCustomName = preferences[KEY_USER_NAME] ?: "User",
+            voiceId = preferences[KEY_VOICE_ID] ?: "tecno_crimson",
+            soundTheme = preferences[KEY_SOUND_THEME] ?: "CRIMSON_CYBER",
+            isSiriBottomStyle = preferences[KEY_SIRI_STYLE] ?: true
         )
     }
 
@@ -84,5 +93,17 @@ class UserSettingsManager(private val context: Context) {
 
     suspend fun setUserCustomName(name: String) {
         context.dataStore.edit { it[KEY_USER_NAME] = name }
+    }
+
+    suspend fun setVoiceId(voiceId: String) {
+        context.dataStore.edit { it[KEY_VOICE_ID] = voiceId }
+    }
+
+    suspend fun setSoundTheme(theme: String) {
+        context.dataStore.edit { it[KEY_SOUND_THEME] = theme }
+    }
+
+    suspend fun setSiriBottomStyle(enabled: Boolean) {
+        context.dataStore.edit { it[KEY_SIRI_STYLE] = enabled }
     }
 }

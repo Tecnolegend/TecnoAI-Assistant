@@ -65,10 +65,14 @@ class WakeWordService : Service() {
             startForeground(NOTIFICATION_ID, notification)
         }
 
-        detector?.startDetection {
+        detector?.startDetection { query ->
             val launchIntent = Intent(this, MainActivity::class.java).apply {
-                this.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP
-                putExtra("EXTRA_START_LISTENING", true)
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+                if (query.isNotBlank()) {
+                    putExtra("EXTRA_INITIAL_QUERY", query)
+                } else {
+                    putExtra("EXTRA_START_LISTENING", true)
+                }
             }
             startActivity(launchIntent)
         }

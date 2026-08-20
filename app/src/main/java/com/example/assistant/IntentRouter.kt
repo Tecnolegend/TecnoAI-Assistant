@@ -24,15 +24,30 @@ data class AssistantDecision(
 
 class IntentRouter {
 
+    fun parseFastIntent(userInput: String): AssistantDecision? {
+        val decision = route(userInput)
+        return if (decision.type == DecisionType.LOCAL_ACTION || decision.type == DecisionType.SENSITIVE_ACTION || decision.directAnswer != null) {
+            decision
+        } else {
+            null
+        }
+    }
+
     fun route(userInput: String): AssistantDecision {
         val text = userInput.trim()
         val lower = text.lowercase()
 
-        // Clean wake word if present in text
+        // Clean wake words if present in text
         val cleaned = lower
             .removePrefix("hey tecno")
+            .removePrefix("hi tecno")
+            .removePrefix("hello tecno")
             .removePrefix("ok tecno")
+            .removePrefix("okay tecno")
             .removePrefix("tecno")
+            .removePrefix("hey techno")
+            .removePrefix("hi techno")
+            .removePrefix("techno")
             .removePrefix(",")
             .trim()
 
@@ -43,8 +58,77 @@ class IntentRouter {
             )
         }
 
-        // 1. Open App Pattern: "open youtube", "launch chrome", "start spotify", etc.
-        val openAppRegex = Pattern.compile("^(?:open|launch|start|run|play)\\s+([a-zA-Z0-9\\s\\._-]+)$", Pattern.CASE_INSENSITIVE)
+        // 0. OWNER & CREATOR IDENTIFICATION (Tecnolegend)
+        if (cleaned.contains("owner") || cleaned.contains("creator") || cleaned.contains("who made you") ||
+            cleaned.contains("who built you") || cleaned.contains("who owns") || cleaned.contains("who is your developer") ||
+            cleaned.contains("who created tecno") || cleaned.contains("who made tecno")) {
+            return AssistantDecision(
+                type = DecisionType.LOCAL_ACTION,
+                directAnswer = "The owner and creator of Tecno AI is Tecnolegend."
+            )
+        }
+
+        // 1. Battery Status: "battery", "battery percentage", "check battery", "how much battery"
+        if (cleaned.contains("battery") || cleaned == "power level" || cleaned.contains("battery percent")) {
+            return AssistantDecision(
+                type = DecisionType.LOCAL_ACTION,
+                toolName = "battery_status"
+            )
+        }
+
+        // 2. Device Specs: "device specs", "phone specs", "system info", "what phone is this"
+        if (cleaned.contains("device specs") || cleaned.contains("phone specs") || cleaned.contains("system info") || cleaned == "specs") {
+            return AssistantDecision(
+                type = DecisionType.LOCAL_ACTION,
+                toolName = "device_specs"
+            )
+        }
+
+        // 3. Volume Control: "volume up", "volume down", "mute", "unmute", "max volume", "set volume to 75%"
+        if (cleaned.contains("volume") || cleaned == "mute" || cleaned == "unmute" || cleaned == "silence") {
+            val action = when {
+                cleaned.contains("up") || cleaned.contains("raise") || cleaned.contains("increase") -> "up"
+                cleaned.contains("down") || cleaned.contains("lower") || cleaned.contains("decrease") -> "down"
+                cleaned.contains("mute") || cleaned.contains("silence") -> "mute"
+                cleaned.contains("unmute") -> "unmute"
+                cleaned.contains("max") || cleaned.contains("full") -> "max"
+                else -> "up"
+            }
+            val numRegex = Pattern.compile("(\\d{1,3})\\s*%?")
+            val numMatcher = numRegex.matcher(cleaned)
+            val level = if (numMatcher.find()) numMatcher.group(1)?.toIntOrNull() else null
+
+            return AssistantDecision(
+                type = DecisionType.LOCAL_ACTION,
+                toolName = "volume_control",
+                parameters = if (level != null) mapOf("action" to "set", "level_percent" to level) else mapOf("action" to action)
+            )
+        }
+
+        // 4. Quick Math Calculator: "what is 25 * 4", "calculate 500 + 20", "15% of 800"
+        val mathRegex = Pattern.compile("^(?:calculate|what is|compute)?\\s*(\\d+(?:\\.\\d+)?\\s*(?:\\+|-|\\*|x|/|times|plus|minus|divided by|% of|percent of)\\s*\\d+(?:\\.\\d+)?)\\s*\\??$", Pattern.CASE_INSENSITIVE)
+        val mathMatcher = mathRegex.matcher(cleaned)
+        if (mathMatcher.find()) {
+            val expr = mathMatcher.group(1)?.trim() ?: ""
+            return AssistantDecision(
+                type = DecisionType.LOCAL_ACTION,
+                toolName = "calculate_math",
+                parameters = mapOf("expression" to expr)
+            )
+        }
+
+        // 5. Flashlight Pattern: "turn on flashlight", "flashlight off", "torch on"
+        if (cleaned.contains("flashlight") || cleaned.contains("torch")) {
+            val turnOn = !cleaned.contains("off") && !cleaned.contains("disable") && !cleaned.contains("stop")
+            return AssistantDecision(
+                type = DecisionType.LOCAL_ACTION,
+                toolName = "toggle_flashlight",
+                parameters = mapOf("enabled" to turnOn)
+            )
+        }
+
+        // 6. Open App Pattern: "open youtube", "launch chrome", "start spotify", etc.
+        val openAppRegex = Pattern.compile("^(?:open|launch|start|run)\\s+([a-zA-Z0-9\\s\\._-]+)$", Pattern.CASE_INSENSITIVE)
         val openAppMatcher = openAppRegex.matcher(cleaned)
         if (openAppMatcher.find()) {
             val target = openAppMatcher.group(1)?.trim() ?: ""
@@ -71,7 +155,7 @@ class IntentRouter {
             )
         }
 
-        // 2. Open URL Pattern: "go to reddit.com", "open website google.com"
+        // 7. Open URL Pattern: "go to reddit.com", "open website google.com"
         val openUrlRegex = Pattern.compile("^(?:go to|browse|visit|open website|open link)\\s+(https?://\\S+|[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,})", Pattern.CASE_INSENSITIVE)
         val urlMatcher = openUrlRegex.matcher(cleaned)
         if (urlMatcher.find()) {
@@ -83,9 +167,9 @@ class IntentRouter {
             )
         }
 
-        // 3. Settings Patterns: "open wifi settings", "turn on bluetooth", "wifi settings"
-        if (cleaned.startsWith("open ") && cleaned.contains("setting")) {
-            val dest = cleaned.removePrefix("open").replace("settings", "").replace("setting", "").trim()
+        // 8. Settings Patterns: "open wifi settings", "bluetooth settings", "wifi settings"
+        if ((cleaned.startsWith("open ") || cleaned.startsWith("turn on ") || cleaned.startsWith("show ")) && (cleaned.contains("setting") || cleaned.contains("wifi") || cleaned.contains("bluetooth") || cleaned.contains("display"))) {
+            val dest = cleaned.removePrefix("open").removePrefix("turn on").removePrefix("show").replace("settings", "").replace("setting", "").trim()
             return AssistantDecision(
                 type = DecisionType.LOCAL_ACTION,
                 toolName = "open_settings",
@@ -93,7 +177,7 @@ class IntentRouter {
             )
         }
 
-        // 4. Timer Pattern: "set a 10 minute timer", "timer 5 minutes", "set timer for 30 seconds"
+        // 9. Timer Pattern: "set a 10 minute timer", "timer 5 minutes", "set timer for 30 seconds"
         val timerRegex = Pattern.compile("(?:set\\s+(?:a\\s+)?)?timer\\s+(?:for\\s+)?(\\d+)\\s*(min|minute|minutes|sec|second|seconds|hour|hours)?(?:\\s+(?:for|labeled|called)\\s+(.+))?", Pattern.CASE_INSENSITIVE)
         val timerMatcher = timerRegex.matcher(cleaned)
         if (timerMatcher.find()) {
@@ -112,7 +196,7 @@ class IntentRouter {
             )
         }
 
-        // 5. Alarm Pattern: "set an alarm for 7:30 am", "set alarm for 8 am", "alarm at 6:00"
+        // 10. Alarm Pattern: "set an alarm for 7:30 am", "set alarm for 8 am", "alarm at 6:00"
         val alarmRegex = Pattern.compile("(?:set\\s+(?:an?\\s+)?)?alarm\\s+(?:for|at)?\\s*(\\d{1,2})(?::(\\d{2}))?\\s*(am|pm)?(?:\\s+(?:for|labeled)\\s+(.+))?", Pattern.CASE_INSENSITIVE)
         val alarmMatcher = alarmRegex.matcher(cleaned)
         if (alarmMatcher.find()) {
@@ -130,17 +214,7 @@ class IntentRouter {
             )
         }
 
-        // 6. Flashlight Pattern: "turn on flashlight", "flashlight off", "torch on"
-        if (cleaned.contains("flashlight") || cleaned.contains("torch")) {
-            val turnOn = !cleaned.contains("off") && !cleaned.contains("disable")
-            return AssistantDecision(
-                type = DecisionType.LOCAL_ACTION,
-                toolName = "toggle_flashlight",
-                parameters = mapOf("enabled" to turnOn)
-            )
-        }
-
-        // 7. Call Contact Pattern: "call mom", "dial 911", "call 1234567890"
+        // 11. Call Contact Pattern: "call mom", "dial 911", "call 1234567890"
         val callRegex = Pattern.compile("^(?:call|dial|phone)\\s+([a-zA-Z0-9\\s+]+)$", Pattern.CASE_INSENSITIVE)
         val callMatcher = callRegex.matcher(cleaned)
         if (callMatcher.find()) {
@@ -153,7 +227,7 @@ class IntentRouter {
             )
         }
 
-        // 8. SMS / Message Pattern: "send message to Alex: I'm coming", "text mom hello"
+        // 12. SMS / Message Pattern: "send message to Alex: I'm coming", "text mom hello"
         val msgRegex = Pattern.compile("^(?:send\\s+(?:a\\s+)?(?:message|text|sms)\\s+to|text|message)\\s+([a-zA-Z0-9\\s+]+?)(?:\\s*[:;]\\s*|\\s+saying\\s+|\\s+that\\s+|\\s+)(.+)$", Pattern.CASE_INSENSITIVE)
         val msgMatcher = msgRegex.matcher(cleaned)
         if (msgMatcher.find()) {
@@ -167,7 +241,7 @@ class IntentRouter {
             )
         }
 
-        // 9. Media playback pattern: "pause music", "resume music", "next song", "play music"
+        // 13. Media playback pattern: "pause music", "resume music", "next song", "play music"
         if (cleaned == "pause music" || cleaned == "pause" || cleaned == "stop music") {
             return AssistantDecision(
                 type = DecisionType.LOCAL_ACTION,
@@ -190,7 +264,7 @@ class IntentRouter {
             )
         }
 
-        // 10. Copy clipboard: "copy this text: hello world"
+        // 14. Copy clipboard: "copy this text: hello world"
         if (cleaned.startsWith("copy to clipboard") || cleaned.startsWith("copy this:")) {
             val textToCopy = cleaned.substringAfter(":").trim()
             return AssistantDecision(
@@ -200,7 +274,7 @@ class IntentRouter {
             )
         }
 
-        // 11. Explicit web search requests: "search the web for...", "google ..."
+        // 15. Explicit web search requests: "search the web for...", "google ..."
         if (cleaned.startsWith("search the web for ") || cleaned.startsWith("search for ") || cleaned.startsWith("google ")) {
             val query = cleaned
                 .removePrefix("search the web for ")
@@ -215,7 +289,7 @@ class IntentRouter {
             )
         }
 
-        // 12. Questions needing real-time info or Gemini AI
+        // 16. Questions needing real-time info or deep Gemini AI consultation
         val isCurrentInfo = lower.contains("today") || lower.contains("latest") || lower.contains("news") ||
                 lower.contains("current") || lower.contains("weather") || lower.contains("price") || lower.contains("score")
 

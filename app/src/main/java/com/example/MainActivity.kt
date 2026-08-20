@@ -61,7 +61,11 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun handleIntent(intent: Intent?) {
-        if (intent?.getBooleanExtra("EXTRA_START_LISTENING", false) == true) {
+        val initialQuery = intent?.getStringExtra("EXTRA_INITIAL_QUERY")
+        if (!initialQuery.isNullOrBlank()) {
+            viewModel.openAssistantOverlay(startVoice = false)
+            viewModel.submitPrompt(initialQuery)
+        } else if (intent?.getBooleanExtra("EXTRA_START_LISTENING", false) == true) {
             viewModel.openAssistantOverlay(startVoice = true)
         }
     }

@@ -2,9 +2,11 @@ package com.example.ui.viewmodel
 
 import android.app.Application
 import android.content.Context
+import android.content.Intent
+import android.os.Build
 import android.os.VibrationEffect
 import android.os.Vibrator
-import android.os.Build
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.TecnoAiApp
@@ -14,11 +16,13 @@ import com.example.assistant.IntentRouter
 import com.example.data.local.ConversationEntity
 import com.example.data.local.UserSettings
 import com.example.data.repository.AssistantRepository
+import com.example.speech.SoundCueHelper
 import com.example.speech.SpeechRecognizerHelper
 import com.example.speech.SpeechState
 import com.example.speech.TextToSpeechHelper
 import com.example.tools.ToolDispatcher
 import com.example.tools.ToolResult
+import com.example.wakeword.WakeWordService
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -54,6 +58,7 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
 
     val speechRecognizerHelper = SpeechRecognizerHelper(application)
     val textToSpeechHelper = TextToSpeechHelper(application)
+    val soundCueHelper = SoundCueHelper()
     val authManager = com.example.auth.AuthManager(application)
 
     val conversationHistory: StateFlow<List<ConversationEntity>> = repository.messagesFlow
@@ -78,6 +83,13 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
     val isOverlayVisible: StateFlow<Boolean> = _isOverlayVisible.asStateFlow()
 
     init {
+        // Apply saved voice profile whenever settings change
+        viewModelScope.launch {
+            userSettings.collect { settings ->
+                textToSpeechHelper.setVoiceProfile(settings.voiceId)
+            }
+        }
+
         // Observe speech recognition states
         viewModelScope.launch {
             speechRecognizerHelper.speechState.collect { speechState ->
@@ -112,6 +124,7 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
     fun openAssistantOverlay(startVoice: Boolean = false) {
         _isOverlayVisible.value = true
         _statusMessage.value = null
+        playActivationEarcon()
         if (startVoice) {
             startVoiceInput()
         }
@@ -127,6 +140,7 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
 
     fun startVoiceInput() {
         triggerHapticFeedback()
+        playActivationEarcon()
         textToSpeechHelper.stop()
         _statusMessage.value = null
         _uiState.value = AssistantUiState.LISTENING
@@ -146,6 +160,15 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
         }
     }
 
+    fun playActivationEarcon() {
+        val theme = try {
+            SoundCueHelper.SoundTheme.valueOf(userSettings.value.soundTheme)
+        } catch (e: Exception) {
+            SoundCueHelper.SoundTheme.CRIMSON_CYBER
+        }
+        soundCueHelper.playActivationSound(theme)
+    }
+
     fun submitPrompt(rawPrompt: String) {
         val prompt = rawPrompt.trim()
         if (prompt.isEmpty()) return
@@ -154,19 +177,28 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
         textToSpeechHelper.stop()
         _liveTranscript.value = prompt
         _uiState.value = AssistantUiState.THINKING
-        _statusMessage.value = "Thinking..."
+        _statusMessage.value = "Processing request..."
 
         viewModelScope.launch {
             // 1. Record User Message in Database
             repository.addMessage(role = "USER", content = prompt)
 
-            // 2. Intent Router evaluation
+            // 2. Intent Router fast evaluation
             val decision = intentRouter.route(prompt)
 
             when (decision.type) {
                 DecisionType.LOCAL_ACTION -> {
+                    if (decision.directAnswer != null) {
+                        // Immediate direct answer (such as Owner = Tecnolegend)
+                        repository.addMessage(role = "ASSISTANT", content = decision.directAnswer)
+                        _statusMessage.value = decision.directAnswer
+                        _uiState.value = AssistantUiState.SUCCESS
+                        speakIfEnabled(decision.directAnswer)
+                        return@launch
+                    }
+
                     _uiState.value = AssistantUiState.EXECUTING
-                    _statusMessage.value = "Executing ${decision.toolName}..."
+                    _statusMessage.value = "Executing ${decision.toolName ?: "action"}..."
 
                     val toolName = decision.toolName ?: "open_app"
                     val result = toolDispatcher.executeTool(
@@ -222,9 +254,9 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
                 }
 
                 DecisionType.AI_QUESTION, DecisionType.WEB_SEARCH, DecisionType.UNSUPPORTED -> {
-                    // Route to Gemini AI
+                    // Deep Gemini AI Consultation & Web Searching
                     _uiState.value = AssistantUiState.THINKING
-                    _statusMessage.value = "Consulting Gemini..."
+                    _statusMessage.value = "Consulting Gemini AI..."
 
                     val history = repository.getRecentMessages(6).map { it.role to it.content }
                     val aiResult = geminiClient.processRequest(
@@ -357,10 +389,10 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
             val vibrator = app.getSystemService(Context.VIBRATOR_SERVICE) as? Vibrator
             if (vibrator != null) {
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                    vibrator.vibrate(VibrationEffect.createOneShot(40, VibrationEffect.DEFAULT_AMPLITUDE))
+                    vibrator.vibrate(VibrationEffect.createOneShot(45, VibrationEffect.DEFAULT_AMPLITUDE))
                 } else {
                     @Suppress("DEPRECATION")
-                    vibrator.vibrate(40)
+                    vibrator.vibrate(45)
                 }
             }
         } catch (e: Exception) {}
@@ -379,7 +411,36 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
     }
 
     fun updateWakeWordEnabled(enabled: Boolean) {
-        viewModelScope.launch { repository.updateSettings { it.setWakeWordEnabled(enabled) } }
+        viewModelScope.launch {
+            repository.updateSettings { it.setWakeWordEnabled(enabled) }
+            try {
+                val serviceIntent = Intent(app, WakeWordService::class.java)
+                if (enabled) {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                        ContextCompat.startForegroundService(app, serviceIntent)
+                    } else {
+                        app.startService(serviceIntent)
+                    }
+                } else {
+                    app.stopService(serviceIntent)
+                }
+            } catch (e: Exception) {
+                // Ignore failure if background permissions are pending
+            }
+        }
+    }
+
+    fun updateVoiceId(voiceId: String) {
+        textToSpeechHelper.setVoiceProfile(voiceId)
+        viewModelScope.launch {
+            repository.updateSettings { it.setVoiceId(voiceId) }
+        }
+    }
+
+    fun updateSoundTheme(theme: String) {
+        viewModelScope.launch {
+            repository.updateSettings { it.setSoundTheme(theme) }
+        }
     }
 
     fun updateTtsEnabled(enabled: Boolean) {

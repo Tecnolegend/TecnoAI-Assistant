@@ -6,23 +6,27 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.content.pm.PackageManager
 import android.hardware.camera2.CameraManager
+import android.media.AudioManager
 import android.net.Uri
+import android.os.BatteryManager
+import android.os.Build
 import android.provider.AlarmClock
 import android.provider.CalendarContract
 import android.provider.ContactsContract
+import android.provider.MediaStore
 import android.provider.Settings
 import android.view.KeyEvent
-import android.media.AudioManager
 import androidx.core.content.ContextCompat
 
 class OpenAppTool : DeviceTool {
     override val definition = ToolDefinition(
         name = "open_app",
-        description = "Opens an installed Android application by package name or common app name (e.g. YouTube, Chrome, Camera, WhatsApp, Spotify, Settings).",
+        description = "Opens an installed Android application by package name or common app name (e.g. YouTube, Chrome, Camera, WhatsApp, Spotify, Settings, Maps, Gallery, Calculator, Clock, Notes, Netflix).",
         parameters = listOf(
-            ToolParameter("app_name", "STRING", "The common name or package name of the app to launch (e.g. 'YouTube', 'Chrome', 'Settings', 'com.google.android.youtube')", required = true)
+            ToolParameter("app_name", "STRING", "The common name or package name of the app to launch (e.g. 'YouTube', 'Chrome', 'Settings', 'Calculator', 'Camera', 'com.google.android.youtube')", required = true)
         )
     )
 
@@ -37,17 +41,23 @@ class OpenAppTool : DeviceTool {
             "maps" to "com.google.android.apps.maps",
             "gmail" to "com.google.android.gm",
             "photos" to "com.google.android.apps.photos",
+            "gallery" to "com.google.android.apps.photos",
             "whatsapp" to "com.whatsapp",
             "spotify" to "com.spotify.music",
             "instagram" to "com.instagram.android",
             "play store" to "com.android.vending",
-            "messages" to "com.google.android.apps.messaging"
+            "messages" to "com.google.android.apps.messaging",
+            "calculator" to "com.google.android.calculator",
+            "clock" to "com.google.android.deskclock",
+            "calendar" to "com.google.android.calendar",
+            "netflix" to "com.netflix.mediaclient",
+            "files" to "com.google.android.apps.nbu.files"
         )
 
         val targetQuery = appName.lowercase()
 
         if (targetQuery == "camera") {
-            val intent = Intent("android.media.action.IMAGE_CAPTURE").apply {
+            val intent = Intent(MediaStore.INTENT_ACTION_STILL_IMAGE_CAMERA).apply {
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             }
             if (intent.resolveActivity(pm) != null) {
@@ -134,9 +144,9 @@ class OpenUrlTool : DeviceTool {
 class SearchWebTool : DeviceTool {
     override val definition = ToolDefinition(
         name = "search_web",
-        description = "Performs a web search using Google or browser.",
+        description = "Performs a web search using Google or default browser.",
         parameters = listOf(
-            ToolParameter("query", "STRING", "Search query terms (e.g. 'today weather', 'latest tech news')", required = true)
+            ToolParameter("query", "STRING", "Search query terms (e.g. 'today weather', 'latest tech news', 'Android 15 features')", required = true)
         )
     )
 
@@ -162,6 +172,172 @@ class SearchWebTool : DeviceTool {
     }
 }
 
+class VolumeControlTool : DeviceTool {
+    override val definition = ToolDefinition(
+        name = "volume_control",
+        description = "Controls media or ring volume (e.g. 'up', 'down', 'mute', 'max', or specific level 0-100).",
+        parameters = listOf(
+            ToolParameter("action", "STRING", "'up', 'down', 'mute', 'unmute', 'max', or 'set'", required = true),
+            ToolParameter("level_percent", "INTEGER", "Optional target volume level from 0 to 100", required = false)
+        )
+    )
+
+    override suspend fun execute(context: Context, params: Map<String, Any?>): ToolResult {
+        val action = (params["action"] as? String)?.trim()?.lowercase() ?: "up"
+        val level = (params["level_percent"] as? Number)?.toInt()
+        val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as? AudioManager
+            ?: return ToolResult(false, "Audio service unavailable")
+
+        val maxVol = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
+
+        return try {
+            when (action) {
+                "up", "raise", "increase" -> {
+                    audioManager.adjustStreamVolume(AudioManager.STREAM_MUSIC, AudioManager.ADJUST_RAISE, AudioManager.FLAG_SHOW_UI)
+                    ToolResult(true, "Volume increased", mapOf("action" to "up"))
+                }
+                "down", "lower", "decrease" -> {
+                    audioManager.adjustStreamVolume(AudioManager.STREAM_MUSIC, AudioManager.ADJUST_LOWER, AudioManager.FLAG_SHOW_UI)
+                    ToolResult(true, "Volume lowered", mapOf("action" to "down"))
+                }
+                "mute", "silent" -> {
+                    audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, 0, AudioManager.FLAG_SHOW_UI)
+                    ToolResult(true, "Media volume muted", mapOf("action" to "mute"))
+                }
+                "unmute" -> {
+                    audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, (maxVol * 0.5f).toInt(), AudioManager.FLAG_SHOW_UI)
+                    ToolResult(true, "Volume restored", mapOf("action" to "unmute"))
+                }
+                "max" -> {
+                    audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, maxVol, AudioManager.FLAG_SHOW_UI)
+                    ToolResult(true, "Volume set to maximum", mapOf("action" to "max"))
+                }
+                "set" -> {
+                    val target = if (level != null) ((level.coerceIn(0, 100) / 100f) * maxVol).toInt() else (maxVol * 0.5f).toInt()
+                    audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, target, AudioManager.FLAG_SHOW_UI)
+                    ToolResult(true, "Volume set to ${level ?: 50}%", mapOf("level" to (level ?: 50).toString()))
+                }
+                else -> ToolResult(false, "Unknown volume action: $action")
+            }
+        } catch (e: Exception) {
+            ToolResult(false, "Failed to adjust volume: ${e.localizedMessage}")
+        }
+    }
+}
+
+class BatteryStatusTool : DeviceTool {
+    override val definition = ToolDefinition(
+        name = "battery_status",
+        description = "Retrieves the current device battery percentage, charging state, and health.",
+        parameters = emptyList()
+    )
+
+    override suspend fun execute(context: Context, params: Map<String, Any?>): ToolResult {
+        val ifilter = IntentFilter(Intent.ACTION_BATTERY_CHANGED)
+        val batteryStatus: Intent? = context.registerReceiver(null, ifilter)
+
+        val level: Int = batteryStatus?.getIntExtra(BatteryManager.EXTRA_LEVEL, -1) ?: -1
+        val scale: Int = batteryStatus?.getIntExtra(BatteryManager.EXTRA_SCALE, -1) ?: -1
+        val batteryPct = if (level >= 0 && scale > 0) (level * 100 / scale) else 0
+
+        val status: Int = batteryStatus?.getIntExtra(BatteryManager.EXTRA_STATUS, -1) ?: -1
+        val isCharging = status == BatteryManager.BATTERY_STATUS_CHARGING || status == BatteryManager.BATTERY_STATUS_FULL
+
+        val chargeState = if (isCharging) "Charging ⚡" else "Discharging"
+        val message = "Battery is at $batteryPct% ($chargeState)"
+
+        return ToolResult(true, message, mapOf("percentage" to batteryPct.toString(), "charging" to isCharging.toString()))
+    }
+}
+
+class DeviceSpecsTool : DeviceTool {
+    override val definition = ToolDefinition(
+        name = "device_specs",
+        description = "Checks device hardware specs, Android OS version, model name, and system info.",
+        parameters = emptyList()
+    )
+
+    override suspend fun execute(context: Context, params: Map<String, Any?>): ToolResult {
+        val model = Build.MODEL
+        val manufacturer = Build.MANUFACTURER.replaceFirstChar { it.uppercase() }
+        val androidVer = Build.VERSION.RELEASE
+        val sdk = Build.VERSION.SDK_INT
+        val brand = Build.BRAND.uppercase()
+
+        val info = "$manufacturer $model (Android $androidVer, API $sdk, $brand)"
+        return ToolResult(true, "Device: $info", mapOf("model" to model, "android" to androidVer, "sdk" to sdk.toString()))
+    }
+}
+
+class CalculateMathTool : DeviceTool {
+    override val definition = ToolDefinition(
+        name = "calculate_math",
+        description = "Evaluates math calculations instantly (e.g. '15 * 84', '20% of 450', '500 + 25').",
+        parameters = listOf(
+            ToolParameter("expression", "STRING", "Math expression to evaluate", required = true)
+        )
+    )
+
+    override suspend fun execute(context: Context, params: Map<String, Any?>): ToolResult {
+        val expr = (params["expression"] as? String)?.trim() ?: return ToolResult(false, "No expression")
+        return try {
+            val clean = expr.lowercase()
+                .replace("plus", "+")
+                .replace("minus", "-")
+                .replace("times", "*")
+                .replace("x", "*")
+                .replace("divided by", "/")
+                .replace("percent of", "% of")
+                .replace(" ", "")
+
+            val result: Double? = if (clean.contains("%of")) {
+                val parts = clean.split("%of")
+                val pct = parts[0].toDoubleOrNull() ?: 0.0
+                val total = parts[1].toDoubleOrNull() ?: 0.0
+                (pct / 100.0) * total
+            } else {
+                evaluateSimpleMath(clean)
+            }
+
+            if (result != null) {
+                val formatted = if (result % 1.0 == 0.0) result.toLong().toString() else String.format("%.2f", result)
+                ToolResult(true, "$expr = $formatted", mapOf("expression" to expr, "result" to formatted))
+            } else {
+                ToolResult(false, "Could not compute $expr")
+            }
+        } catch (e: Exception) {
+            ToolResult(false, "Calculation error: ${e.localizedMessage}")
+        }
+    }
+
+    private fun evaluateSimpleMath(str: String): Double? {
+        return try {
+            when {
+                str.contains("+") -> {
+                    val p = str.split("+")
+                    (p[0].toDoubleOrNull() ?: 0.0) + (p[1].toDoubleOrNull() ?: 0.0)
+                }
+                str.contains("-") -> {
+                    val p = str.split("-")
+                    (p[0].toDoubleOrNull() ?: 0.0) - (p[1].toDoubleOrNull() ?: 0.0)
+                }
+                str.contains("*") -> {
+                    val p = str.split("*")
+                    (p[0].toDoubleOrNull() ?: 0.0) * (p[1].toDoubleOrNull() ?: 0.0)
+                }
+                str.contains("/") -> {
+                    val p = str.split("/")
+                    val denom = p[1].toDoubleOrNull() ?: 1.0
+                    if (denom == 0.0) null else (p[0].toDoubleOrNull() ?: 0.0) / denom
+                }
+                else -> str.toDoubleOrNull()
+            }
+        } catch (e: Exception) {
+            null
+        }
+    }
+}
+
 class OpenSettingsTool : DeviceTool {
     override val definition = ToolDefinition(
         name = "open_settings",
@@ -174,7 +350,7 @@ class OpenSettingsTool : DeviceTool {
     override suspend fun execute(context: Context, params: Map<String, Any?>): ToolResult {
         val dest = (params["destination"] as? String)?.trim()?.lowercase() ?: "general"
         val action = when (dest) {
-            "wifi", "wi-fi", "network" -> Settings.ACTION_WIFI_SETTINGS
+            "wifi", "wi-fi", "network", "internet" -> Settings.ACTION_WIFI_SETTINGS
             "bluetooth", "bt" -> Settings.ACTION_BLUETOOTH_SETTINGS
             "display", "screen", "brightness" -> Settings.ACTION_DISPLAY_SETTINGS
             "sound", "volume", "audio" -> Settings.ACTION_SOUND_SETTINGS
@@ -437,7 +613,7 @@ class CopyToClipboardTool : DeviceTool {
         return if (clipboard != null) {
             val clip = ClipData.newPlainText("Tecno AI Copy", text)
             clipboard.setPrimaryClip(clip)
-            ToolResult(true, "Copied text to clipboard: \"$text\"", mapOf("text" to text))
+            ToolResult(true, "Copied to clipboard: \"$text\"", mapOf("text" to text))
         } else {
             ToolResult(false, "Clipboard unavailable")
         }
