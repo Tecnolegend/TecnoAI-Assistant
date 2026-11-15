@@ -1,28 +1,38 @@
-# TecnoAI Assistant
+<p align="center"><img src="docs/banner.jpg" alt="Tecno AI — voice assistant for Android" width="100%"></p>
 
-An Android voice assistant powered by Google Gemini. Say the wake word, ask a question or give a command, and TecnoAI answers out loud or takes action on your phone.
+# Tecno AI
+
+An Android voice assistant powered by Google Gemini. Say **"Hey Tecno"**, ask a question or give a command, and Tecno AI answers out loud or takes action on your phone.
+
+## Download
+Get the latest APK from **[Releases → Latest](https://github.com/Tecnolegend/TecnoAI-Assistant/releases/latest)**, open it on your phone and allow installing from this source. New versions install over the old one and keep your data.
 
 ## Features
-- **Wake word** — hands-free activation that runs in the background
-- **Voice in, voice out** — speech recognition and text-to-speech replies
+- **"Hey Tecno" wake word** — hands-free activation that runs in the background (can be switched off in Settings)
+- **Voice in, voice out** — speech recognition and natural text-to-speech replies
 - **Voice enrollment** — trains on your voice during setup
-- **Floating overlay** — call the assistant on top of any app, or set it as your system assist app
-- **Device control** — opens apps, handles system actions, and uses an accessibility service for on-screen tasks
-- **Offline mode** — handles basic commands without internet
-- **Personalization** — learns your preferences over time
-- **Conversation history** — saved locally on the device
-- **Permissions center** — see and manage every permission in one place
+- **Floating bubble & assist overlay** — call Tecno AI on top of any app, or set it as your phone's assist app
+- **Device control** — open apps, call, message, set alarms and timers, flashlight, settings, and on-screen actions through the accessibility service
+- **Works offline** — common commands run on the phone without internet
+- **Clear errors** — tells you when your API key is wrong, the free limit is reached, or you're offline
+- **Personalization & history** — learns your preferences; conversations stay on your device
+
+## Setup
+1. Get a free Gemini API key from [Google AI Studio](https://aistudio.google.com/apikey).
+2. Open Tecno AI → **Settings** → paste your key (up to 5 keys; it switches to the next one if a key hits its limit).
+3. Allow the microphone, and optionally the overlay and accessibility permissions for full phone control.
+
+## Build it yourself
+```bash
+cp .env.example .env    # optionally set GEMINI_API_KEY
+gradle :app:assembleDebug
+```
+Requires JDK 17 and the Android SDK (Android Studio). Every push to GitHub is built automatically by GitHub Actions.
+
+Optional cloud sign-in: add your Firebase `app/google-services.json` and set `GOOGLE_WEB_CLIENT_ID` in `.env`. Without them the app works fully and simply hides cloud sign-in.
 
 ## Built with
-Kotlin · Jetpack Compose · Room · Gemini API · GitHub Actions
-
-## Getting started
-1. Clone the repo and open it in Android Studio.
-2. Get a Gemini API key from [Google AI Studio](https://aistudio.google.com/).
-3. Copy `.env.example` to `.env` and set `GEMINI_API_KEY`.
-4. Run the app on a device with Android 7.0 (API 24) or newer.
-
-A debug APK is also built automatically by GitHub Actions on every push to `main`.
+Kotlin · Jetpack Compose · Room · DataStore · Retrofit · Gemini API · GitHub Actions
 
 ## Author
 Made by [Tecnolegend](https://github.com/Tecnolegend) ·

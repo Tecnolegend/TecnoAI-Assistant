@@ -16,3 +16,7 @@
 local.properties
 .env
 debug.keystore
+# App signing key: never commit it
+signing/
+*.jks
+*.keystore

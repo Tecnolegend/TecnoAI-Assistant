@@ -1,35 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:aapt="http://schemas.android.com/aapt"
-    android:width="108dp"
-    android:height="108dp"
-    android:viewportWidth="108"
-    android:viewportHeight="108">
+    android:width="108dp" android:height="108dp"
+    android:viewportWidth="108" android:viewportHeight="108">
     <path android:pathData="M0,0h108v108h-108z">
         <aapt:attr name="android:fillColor">
-            <gradient
-                android:startX="0"
-                android:startY="0"
-                android:endX="108"
-                android:endY="108"
-                android:type="linear">
-                <item android:color="#1A0204" android:offset="0.0" />
-                <item android:color="#36060A" android:offset="0.5" />
-                <item android:color="#120102" android:offset="1.0" />
-            </gradient>
-        </aapt:attr>
-    </path>
-    <!-- Subtle circular glow -->
-    <path android:pathData="M54,18 A36,36 0 1 0 54,90 A36,36 0 1 0 54,18 Z">
-        <aapt:attr name="android:fillColor">
-            <gradient
-                android:startX="54"
-                android:startY="18"
-                android:endX="54"
-                android:endY="90"
-                android:type="linear">
-                <item android:color="#33E50914" android:offset="0.0" />
-                <item android:color="#05E50914" android:offset="1.0" />
+            <gradient android:type="radial" android:centerX="54" android:centerY="45" android:gradientRadius="76">
+                <item android:offset="0" android:color="#FF3A0C14"/>
+                <item android:offset="0.55" android:color="#FF16060A"/>
+                <item android:offset="1" android:color="#FF080203"/>
             </gradient>
         </aapt:attr>
     </path>

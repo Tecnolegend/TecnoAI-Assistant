@@ -1,50 +1,38 @@
 <?xml version="1.0" encoding="utf-8"?>
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:aapt="http://schemas.android.com/aapt"
-    android:width="108dp"
-    android:height="108dp"
-    android:viewportWidth="108"
-    android:viewportHeight="108">
-    <!-- Glowing Outer Halo Orbit -->
-    <path
-        android:pathData="M54,28 A26,26 0 1 0 54,80 A26,26 0 1 0 54,28 Z"
-        android:strokeWidth="3.5"
-        android:strokeLineCap="round">
-        <aapt:attr name="android:strokeColor">
-            <gradient
-                android:startX="28"
-                android:startY="28"
-                android:endX="80"
-                android:endY="80"
-                android:type="linear">
-                <item android:color="#FFFF2D55" android:offset="0.0" />
-                <item android:color="#FFE50914" android:offset="0.5" />
-                <item android:color="#FF8A0010" android:offset="1.0" />
-            </gradient>
-        </aapt:attr>
-    </path>
-    <!-- Central AI Pulse / Tecno T Node -->
-    <path
-        android:pathData="M38,40 L70,40 L70,47 L58,47 L58,70 L50,70 L50,47 L38,47 Z"
-        android:fillType="nonZero">
+    android:width="108dp" android:height="108dp"
+    android:viewportWidth="108" android:viewportHeight="108">
+    <!-- soft glow -->
+    <path android:pathData="M24,54 A30,30 0 1 0 84,54 A30,30 0 1 0 24,54 Z">
         <aapt:attr name="android:fillColor">
-            <gradient
-                android:startX="38"
-                android:startY="40"
-                android:endX="70"
-                android:endY="70"
-                android:type="linear">
-                <item android:color="#FFFFFFFF" android:offset="0.0" />
-                <item android:color="#FFFF8080" android:offset="0.4" />
-                <item android:color="#FFFF2A3A" android:offset="1.0" />
+            <gradient android:type="radial" android:centerX="54" android:centerY="54" android:gradientRadius="30">
+                <item android:offset="0" android:color="#73FF2D55"/>
+                <item android:offset="1" android:color="#00FF2D55"/>
             </gradient>
         </aapt:attr>
     </path>
-    <!-- Sparkle/Energy Accent -->
-    <path
-        android:pathData="M72,32 L74,38 L80,40 L74,42 L72,48 L70,42 L64,40 L70,38 Z"
-        android:fillColor="#FFFF4D67" />
-    <path
-        android:pathData="M36,66 L37.5,70 L41.5,71.5 L37.5,73 L36,77 L34.5,73 L30.5,71.5 L34.5,70 Z"
-        android:fillColor="#FFFF8099" />
+    <!-- crimson ring -->
+    <path android:fillType="evenOdd" android:pathData="M26.9,54 A27.1,27.1 0 1 0 81.1,54 A27.1,27.1 0 1 0 26.9,54 Z M31.1,54 A22.9,22.9 0 1 0 76.9,54 A22.9,22.9 0 1 0 31.1,54 Z">
+        <aapt:attr name="android:fillColor">
+            <gradient android:type="linear" android:startX="30" android:startY="26" android:endX="80" android:endY="84">
+                <item android:offset="0" android:color="#FFFF4D6D"/>
+                <item android:offset="0.5" android:color="#FFE50914"/>
+                <item android:offset="1" android:color="#FF7A000E"/>
+            </gradient>
+        </aapt:attr>
+    </path>
+    <!-- T -->
+    <path android:pathData="M43.7,40 H64.3 A3.2,3.2 0 0 1 67.5,43.2 V43.199999999999996 A3.2,3.2 0 0 1 64.3,46.4 H43.7 A3.2,3.2 0 0 1 40.5,43.199999999999996 V43.2 A3.2,3.2 0 0 1 43.7,40 Z M54.0,40 H53.99999999999999 A3.2,3.2 0 0 1 57.199999999999996,43.2 V65.8 A3.2,3.2 0 0 1 53.99999999999999,69 H54.0 A3.2,3.2 0 0 1 50.8,65.8 V43.2 A3.2,3.2 0 0 1 54.0,40 Z">
+        <aapt:attr name="android:fillColor">
+            <gradient android:type="linear" android:startX="54" android:startY="38" android:endX="54" android:endY="72">
+                <item android:offset="0" android:color="#FFFFFFFF"/>
+                <item android:offset="1" android:color="#FFFFD0D8"/>
+            </gradient>
+        </aapt:attr>
+    </path>
+    <!-- voice bars -->
+    <path android:fillColor="#FFFF4D6D" android:pathData="M44.7,51 H44.7 A2.1,2.1 0 0 1 46.800000000000004,53.1 V59.9 A2.1,2.1 0 0 1 44.7,62 H44.7 A2.1,2.1 0 0 1 42.6,59.9 V53.1 A2.1,2.1 0 0 1 44.7,51 Z M63.300000000000004,51 H63.300000000000004 A2.1,2.1 0 0 1 65.4,53.1 V62.9 A2.1,2.1 0 0 1 63.300000000000004,65 H63.300000000000004 A2.1,2.1 0 0 1 61.2,62.9 V53.1 A2.1,2.1 0 0 1 63.300000000000004,51 Z"/>
+    <!-- AI sparkle -->
+    <path android:fillColor="#FFFFFFFF" android:pathData="M73,31 C73.7,34.6 74.6,35.5 78.2,36.2 C74.6,36.9 73.7,37.8 73,41.4 C72.3,37.8 71.4,36.9 67.8,36.2 C71.4,35.5 72.3,34.6 73,31 Z"/>
 </vector>
