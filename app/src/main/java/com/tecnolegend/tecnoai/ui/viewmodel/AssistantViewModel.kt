@@ -128,6 +128,59 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
 
     private var lastSubmittedPrompt: String? = null
 
+    // --- Screen sharing (Gemini-style "ask about my screen") ---
+    private val _shareScreen = MutableStateFlow(false)
+    /** When on, every question includes a fresh screenshot of what's on screen. */
+    val shareScreen: StateFlow<Boolean> = _shareScreen.asStateFlow()
+
+    private val _hideOverlayForCapture = MutableStateFlow(false)
+    /** The overlay hides itself for a moment while the screenshot is taken. */
+    val hideOverlayForCapture: StateFlow<Boolean> = _hideOverlayForCapture.asStateFlow()
+
+    private val _screenNotice = MutableStateFlow<String?>(null)
+    val screenNotice: StateFlow<String?> = _screenNotice.asStateFlow()
+
+    fun toggleShareScreen() {
+        val turningOn = !_shareScreen.value
+        _shareScreen.value = turningOn
+        _screenNotice.value = if (turningOn && !com.tecnolegend.tecnoai.accessibility.TecnoAccessibilityService.isServiceRunning()) {
+            "To see your screen, turn on Tecno AI in Settings > Accessibility."
+        } else null
+    }
+
+    // --- Chat sessions: "New chat" starts a fresh view without deleting history ---
+    private val _chatStartedAt = MutableStateFlow(0L)
+
+    /** Messages of the current chat (everything after the last "New chat"). */
+    val chatMessages: StateFlow<List<ConversationEntity>> =
+        kotlinx.coroutines.flow.combine(repository.messagesFlow, _chatStartedAt) { all, since ->
+            all.filter { it.timestamp >= since }
+        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    fun newChat() {
+        stopSpeaking()
+        _chatStartedAt.value = System.currentTimeMillis()
+        _statusMessage.value = null
+        _uiState.value = AssistantUiState.IDLE
+    }
+
+    private val screenWords = Regex(
+        "\\b(my screen|this screen|on screen|the screen|what am i (looking at|seeing)|what's this|what is this|this page|this app|this message|this photo|this image|read (this|it)|summari[sz]e (this|it)|translate (this|it)|explain (this|it))\\b"
+    )
+
+    private fun mentionsScreen(prompt: String) = screenWords.containsMatchIn(prompt.lowercase())
+
+    /** Captures the screen (hiding the assistant panel briefly) for screen questions. */
+    private suspend fun captureScreenContext(): Pair<ByteArray?, String?> {
+        val service = com.tecnolegend.tecnoai.accessibility.TecnoAccessibilityService.instance ?: return null to null
+        _hideOverlayForCapture.value = true
+        kotlinx.coroutines.delay(180)
+        val image = try { service.captureScreenshotJpeg() } catch (e: Exception) { null }
+        val text = try { service.captureScreenContentSummary() } catch (e: Exception) { null }
+        _hideOverlayForCapture.value = false
+        return image to text
+    }
+
     init {
         // Apply saved voice profile & mic gain whenever settings change, and ensure wake word service is active if permitted
         viewModelScope.launch {
@@ -168,6 +221,15 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
                         _statusMessage.value = speechState.message
                     }
                     else -> {}
+                }
+            }
+        }
+
+        // When the voice finishes reading the answer, leave "Speaking" state
+        viewModelScope.launch {
+            textToSpeechHelper.isSpeaking.collect { speaking ->
+                if (!speaking && _uiState.value == AssistantUiState.SPEAKING) {
+                    _uiState.value = AssistantUiState.SUCCESS
                 }
             }
         }
@@ -223,26 +285,23 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
     fun openAssistantOverlay(startVoice: Boolean = false, speakGreeting: Boolean = false) {
         _isOverlayVisible.value = true
         _statusMessage.value = null
-        playActivationEarcon()
-        if (speakGreeting) {
-            val greeting = "How can I help you?"
-            _liveTranscript.value = greeting
-            speakIfEnabled(greeting)
-            startVoiceInput()
-        } else if (startVoice) {
-            startVoiceInput()
+        _liveTranscript.value = ""
+        if (startVoice || speakGreeting) {
+            startVoiceInput() // plays the chime itself
+        } else {
+            playActivationEarcon()
         }
     }
 
     fun handleWakeWordTrigger(initialQuery: String?) {
         _isOverlayVisible.value = true
-        playActivationEarcon()
+        _liveTranscript.value = ""
         if (!initialQuery.isNullOrBlank()) {
+            // "Hey Tecno, <question>": answer straight away
+            playActivationEarcon()
             submitPrompt(initialQuery)
         } else {
-            val greeting = "How can I help you?"
-            _statusMessage.value = greeting
-            speakIfEnabled(greeting)
+            // Like Siri: a chime, then listen (no spoken greeting the mic would hear)
             startVoiceInput()
         }
     }
@@ -267,9 +326,16 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
         pauseWakeWordListener()
 
         val currentGain = userSettings.value.micSensitivityGain
-        speechRecognizerHelper.startListening(gain = currentGain) { transcribedText ->
-            if (transcribedText.isNotBlank()) {
-                submitPrompt(transcribedText)
+        viewModelScope.launch {
+            // Let the chime finish so the recognizer doesn't hear it
+            kotlinx.coroutines.delay(220)
+            if (_uiState.value != AssistantUiState.LISTENING) return@launch
+            speechRecognizerHelper.startListening(gain = currentGain) { transcribedText ->
+                if (transcribedText.isNotBlank()) {
+                    playListeningDoneEarcon()
+                    replyAloud = true
+                    submitPrompt(transcribedText)
+                }
             }
         }
     }
@@ -279,6 +345,16 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
         if (_uiState.value == AssistantUiState.LISTENING || _uiState.value == AssistantUiState.TRANSCRIBING) {
             _uiState.value = AssistantUiState.IDLE
         }
+    }
+
+    private fun currentSoundTheme(): SoundCueHelper.SoundTheme = try {
+        SoundCueHelper.SoundTheme.valueOf(userSettings.value.soundTheme)
+    } catch (e: Exception) {
+        SoundCueHelper.SoundTheme.CRIMSON_CYBER
+    }
+
+    private fun playListeningDoneEarcon() {
+        soundCueHelper.playDoneSound(currentSoundTheme())
     }
 
     fun playActivationEarcon() {
@@ -433,12 +509,30 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
             _statusMessage.value = "Tecno AI Processing..."
 
             try {
-                val history = repository.getRecentMessages(6).map { it.role to it.content }
+                // Oldest first, without the question we just saved (it's sent separately)
+                val history = repository.getRecentMessages(7)
+                    .reversed()
+                    .filter { it.timestamp >= _chatStartedAt.value }
+                    .dropLast(1)
+                    .filter { it.role == "USER" || it.role == "ASSISTANT" }
+                    .map { it.role to it.content }
+
+                val wantsScreen = _shareScreen.value || mentionsScreen(prompt)
+                val (screenImage, screenText) = if (wantsScreen) captureScreenContext() else null to null
+                if (wantsScreen && screenImage == null && screenText == null) {
+                    _screenNotice.value = "To see your screen, turn on Tecno AI in Settings > Accessibility."
+                }
+                if (screenImage != null || screenText != null) {
+                    _statusMessage.value = "Looking at your screen..."
+                }
+
                 val aiResult = geminiClient.processRequest(
                     userPrompt = prompt,
                     conversationHistory = history,
                     model = userSettings.value.selectedModel,
-                    context = app
+                    context = app,
+                    screenImageJpeg = screenImage,
+                    screenText = screenText
                 )
 
                 val duration = System.currentTimeMillis() - startTime
@@ -554,12 +648,29 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
         }
     }
 
+    // Speak replies only for voice questions or in the voice pop-up (typed chat stays quiet)
+    private var replyAloud = false
+
+    /** Send a question typed in the chat box. */
+    fun submitTypedPrompt(text: String) {
+        replyAloud = false
+        submitPrompt(text)
+    }
+
     private fun speakIfEnabled(text: String) {
-        if (userSettings.value.isTtsEnabled) {
+        if (userSettings.value.isTtsEnabled && (replyAloud || _isOverlayVisible.value)) {
             _uiState.value = AssistantUiState.SPEAKING
-            textToSpeechHelper.speak(text)
+            textToSpeechHelper.speak(plainForSpeech(text))
         }
     }
+
+    /** Remove Markdown symbols and links so the voice doesn't read "asterisk". */
+    private fun plainForSpeech(text: String): String = text
+        .replace(Regex("```[\\s\\S]*?```"), " ")
+        .replace(Regex("\\[([^\\]]+)]\\([^)]*\\)"), "$1")
+        .replace(Regex("[*_`#>]+"), "")
+        .replace(Regex("\\s+"), " ")
+        .trim()
 
     fun stopSpeaking() {
         textToSpeechHelper.stop()

@@ -6,26 +6,29 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 
 private val DarkColorScheme = darkColorScheme(
-    primary = CrimsonBright,
-    onPrimary = Color.White,
-    primaryContainer = CrimsonDark,
-    onPrimaryContainer = Color(0xFFFFDADA),
+    primary = TextPrimary,
+    onPrimary = Color(0xFF0B0B0C),
+    primaryContainer = DarkSurfaceElevated,
+    onPrimaryContainer = TextPrimary,
     secondary = CrimsonPrimary,
     onSecondary = Color.White,
-    secondaryContainer = DarkSurfaceElevated,
-    onSecondaryContainer = TextAccent,
-    tertiary = Color(0xFFFF7597),
-    onTertiary = Color.White,
+    secondaryContainer = DarkSurfaceVariant,
+    onSecondaryContainer = TextPrimary,
+    tertiary = InfoBlue,
+    onTertiary = Color.Black,
     background = DarkBackground,
     onBackground = TextPrimary,
     surface = DarkSurface,
     onSurface = TextPrimary,
     surfaceVariant = DarkSurfaceVariant,
     onSurfaceVariant = TextSecondary,
+    surfaceContainer = DarkSurface,
+    surfaceContainerHigh = DarkSurfaceVariant,
+    surfaceContainerHighest = DarkSurfaceElevated,
     outline = DarkBorder,
-    outlineVariant = Color(0xFF3D0F16),
-    error = Color(0xFFFF5252),
-    onError = Color.White
+    outlineVariant = Color(0xFF232325),
+    error = Color(0xFFFF6B6B),
+    onError = Color.Black
 )
 
 private val LightColorScheme = darkColorScheme(

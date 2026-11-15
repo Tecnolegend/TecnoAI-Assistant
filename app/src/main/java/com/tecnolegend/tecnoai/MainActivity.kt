@@ -34,7 +34,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.tecnolegend.tecnoai.ui.components.AssistantOverlaySheet
 import com.tecnolegend.tecnoai.ui.screens.AboutScreen
-import com.tecnolegend.tecnoai.ui.screens.AssistantHomeScreen
+import com.tecnolegend.tecnoai.ui.screens.ChatScreen
 import com.tecnolegend.tecnoai.ui.screens.HistoryScreen
 import com.tecnolegend.tecnoai.ui.screens.OnboardingScreen
 import com.tecnolegend.tecnoai.ui.screens.PermissionsCenterScreen
@@ -141,7 +141,7 @@ fun TecnoAiAppContent(viewModel: AssistantViewModel) {
             }
 
             composable("home") {
-                AssistantHomeScreen(
+                ChatScreen(
                     viewModel = viewModel,
                     onNavigateToHistory = { navController.navigate("history") },
                     onNavigateToPermissions = { navController.navigate("permissions") },
@@ -197,7 +197,7 @@ fun TecnoAiAppContent(viewModel: AssistantViewModel) {
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .background(Color.Black.copy(alpha = 0.65f))
+                    .background(Color.Black.copy(alpha = 0.45f))
                     .clickable(
                         interactionSource = remember { MutableInteractionSource() },
                         indication = null,

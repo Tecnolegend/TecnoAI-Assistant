@@ -80,6 +80,54 @@ class TecnoAccessibilityService : AccessibilityService() {
     // 2. SCREEN SEEING & CONTENT EXTRACTION (Vision & Context)
     // ============================================================================
 
+    /**
+     * Takes a private screenshot (Android 11+) for "ask about my screen".
+     * Returns a JPEG (max 1280px on the long side) or null if unavailable.
+     */
+    suspend fun captureScreenshotJpeg(): ByteArray? {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) return null
+        return kotlinx.coroutines.suspendCancellableCoroutine { cont ->
+            try {
+                takeScreenshot(
+                    android.view.Display.DEFAULT_DISPLAY,
+                    mainExecutor,
+                    object : TakeScreenshotCallback {
+                        override fun onSuccess(result: ScreenshotResult) {
+                            val bytes = try {
+                                val hw = android.graphics.Bitmap.wrapHardwareBuffer(result.hardwareBuffer, result.colorSpace)
+                                val soft = hw?.copy(android.graphics.Bitmap.Config.ARGB_8888, false)
+                                hw?.recycle()
+                                result.hardwareBuffer.close()
+                                soft?.let { bmp ->
+                                    val scale = 1280f / maxOf(bmp.width, bmp.height)
+                                    val out = if (scale < 1f) {
+                                        android.graphics.Bitmap.createScaledBitmap(bmp, (bmp.width * scale).toInt(), (bmp.height * scale).toInt(), true)
+                                    } else bmp
+                                    val stream = java.io.ByteArrayOutputStream()
+                                    out.compress(android.graphics.Bitmap.CompressFormat.JPEG, 72, stream)
+                                    if (out !== bmp) out.recycle()
+                                    bmp.recycle()
+                                    stream.toByteArray()
+                                }
+                            } catch (e: Exception) {
+                                Log.w("TecnoAccessibility", "Screenshot convert failed: ${e.message}")
+                                null
+                            }
+                            if (cont.isActive) cont.resumeWith(Result.success(bytes))
+                        }
+
+                        override fun onFailure(errorCode: Int) {
+                            Log.w("TecnoAccessibility", "Screenshot failed: $errorCode")
+                            if (cont.isActive) cont.resumeWith(Result.success(null))
+                        }
+                    }
+                )
+            } catch (e: Exception) {
+                if (cont.isActive) cont.resumeWith(Result.success(null))
+            }
+        }
+    }
+
     fun captureScreenContentSummary(): String {
         val rootNode = rootInActiveWindow ?: return "Screen is currently unavailable or locked."
         val textElements = mutableListOf<String>()

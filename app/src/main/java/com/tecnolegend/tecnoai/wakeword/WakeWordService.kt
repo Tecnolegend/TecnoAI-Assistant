@@ -123,20 +123,7 @@ class WakeWordService : Service() {
         BugTracker.logInfo(TAG, "Wake word triggered: '$cleanQuery'")
 
         serviceScope.launch {
-            // 1. Play activation sound cue based on user settings
-            try {
-                val settings = userSettingsManager?.userSettingsFlow?.firstOrNull()
-                val themeName = settings?.soundTheme ?: SoundCueHelper.SoundTheme.CRIMSON_CYBER.name
-                val theme = try {
-                    SoundCueHelper.SoundTheme.valueOf(themeName)
-                } catch (e: Exception) {
-                    SoundCueHelper.SoundTheme.CRIMSON_CYBER
-                }
-                soundCueHelper?.playActivationSound(theme)
-            } catch (e: Exception) {
-                Log.w(TAG, "Failed to play sound cue: ${e.message}")
-            }
-
+            // The assistant window plays the activation chime itself (only once)
             // 2. Prepare Overlay Activity Intent
             val overlayIntent = Intent(this@WakeWordService, AssistOverlayActivity::class.java).apply {
                 if (cleanQuery.isNotBlank()) {

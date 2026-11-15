@@ -19,15 +19,23 @@ data class AiExecutionResult(
 class GeminiClient {
 
     private val systemPrompt = """
-        You are Tecno AI, the ultra-fast, high-power Android assistant developed by Tecnolegend.
-        Your tone is confident, modern, crisp, polite, and deeply knowledgeable.
-        
-        CRITICAL IDENTITY KNOWLEDGE:
-        The owner, developer, and creator of Tecno AI is Tecnolegend. Whenever users ask who is the owner, what is the owner's name, who created Tecno AI, or the Tecno AI owner name, always state clearly that the owner and creator is Tecnolegend.
+        You are Tecno AI, a helpful voice and chat assistant on the user's Android phone, made by Tecnolegend.
 
-        When asked to perform a device action (such as opening an app, controlling media, toggling flashlight, adjusting volume, wifi, bluetooth, setting timers, alarms, calendar events, battery check, calling, messaging, contacts, screen clicking, or navigation), invoke the corresponding registered function tool.
-        For general questions, analysis, consulting, calculations, problem-solving, or explanations, provide structured, clear, and high-value insights.
-        Never hallucinate that a device action occurred without invoking the actual tool.
+        Style:
+        - Be warm, direct and natural. Answer the question first, then add detail only if it helps.
+        - Many replies are read aloud: keep answers short (1-3 sentences) unless the user asks for more.
+        - Use simple Markdown (short lists, **bold**) only when it genuinely helps; no headings for short answers.
+
+        Phone actions:
+        - When the user asks to do something on the phone (open apps, call, message, alarms, timers, volume,
+          flashlight, wifi, bluetooth, media, clicking on screen, navigation), call the matching tool.
+        - Never claim an action happened unless you called the tool.
+
+        Screen:
+        - If a screenshot of the user's screen is attached, it is what they are looking at right now.
+          Use it to answer questions about "this", "my screen", the current app, page or message.
+
+        Identity: if asked who made Tecno AI, say it was created by Tecnolegend.
     """.trimIndent()
 
     private fun getToolDeclarations(): List<GeminiToolWrapper> {
@@ -64,7 +72,9 @@ class GeminiClient {
         userPrompt: String,
         conversationHistory: List<Pair<String, String>> = emptyList(),
         model: String = "gemini-2.5-flash",
-        context: Context? = null
+        context: Context? = null,
+        screenImageJpeg: ByteArray? = null,
+        screenText: String? = null
     ): AiExecutionResult = withContext(Dispatchers.IO) {
         val lowerPrompt = userPrompt.lowercase()
 
@@ -108,13 +118,23 @@ class GeminiClient {
             )
         }
 
-        // Add current user prompt
-        contents.add(
-            GeminiContent(
-                role = "user",
-                parts = listOf(GeminiPart(text = userPrompt))
+        // Add current user prompt, plus what's on screen when shared
+        val userParts = mutableListOf<GeminiPart>()
+        if (screenImageJpeg != null) {
+            userParts.add(
+                GeminiPart(
+                    inlineData = GeminiInlineData(
+                        mimeType = "image/jpeg",
+                        data = android.util.Base64.encodeToString(screenImageJpeg, android.util.Base64.NO_WRAP)
+                    )
+                )
             )
-        )
+        }
+        val promptText = if (!screenText.isNullOrBlank()) {
+            "$userPrompt\n\n[Text visible on my screen]\n${screenText.take(3000)}"
+        } else userPrompt
+        userParts.add(GeminiPart(text = promptText))
+        contents.add(GeminiContent(role = "user", parts = userParts))
 
         val request = GeminiRequest(
             contents = contents,

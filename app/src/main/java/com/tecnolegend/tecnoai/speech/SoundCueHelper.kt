@@ -5,135 +5,119 @@ import android.media.AudioFormat
 import android.media.AudioTrack
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlin.math.PI
+import kotlin.math.exp
+import kotlin.math.min
 import kotlin.math.sin
 
+/**
+ * Short, soft interface sounds (start listening / done listening).
+ *
+ * Tones are synthesized with a running phase and smooth attack/decay envelopes,
+ * so they never click or pop, and only one sound plays at a time.
+ */
 class SoundCueHelper {
 
     enum class SoundTheme(val displayName: String) {
-        CRIMSON_CYBER("Tecno Cyber (Futuristic Chime)"),
-        NEURAL_PULSE("Neural Pulse (Soft Dual Tone)"),
-        HYPER_ASCENT("Hyper Ascent (Bionic Tri-Tone)"),
-        MINIMAL_POP("Minimal Glass Pop"),
+        CRIMSON_CYBER("Tecno Chime (default)"),
+        NEURAL_PULSE("Soft Bell"),
+        HYPER_ASCENT("Bright Arpeggio"),
+        MINIMAL_POP("Minimal Pop"),
         MUTE("Silent (Haptic Only)")
     }
 
-    private val scope = CoroutineScope(Dispatchers.Default)
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+    private val sampleRate = 44100
 
-    /**
-     * Synthesizes and plays a clean, low-latency audio cue in the background.
-     */
+    @Volatile
+    private var currentTrack: AudioTrack? = null
+
+    /** Played when the assistant starts listening. */
     fun playActivationSound(theme: SoundTheme = SoundTheme.CRIMSON_CYBER) {
         if (theme == SoundTheme.MUTE) return
+        val notes = when (theme) {
+            SoundTheme.CRIMSON_CYBER -> listOf(Note(1046.5, 0, 150), Note(1568.0, 70, 260))
+            SoundTheme.NEURAL_PULSE -> listOf(Note(880.0, 0, 420))
+            SoundTheme.HYPER_ASCENT -> listOf(Note(1046.5, 0, 140), Note(1318.5, 60, 160), Note(1568.0, 120, 260))
+            SoundTheme.MINIMAL_POP -> listOf(Note(900.0, 0, 90, glideTo = 1300.0))
+            SoundTheme.MUTE -> emptyList()
+        }
+        play(notes, volume = 0.22)
+    }
 
+    /** Played when the user stops talking (the question was heard). */
+    fun playDoneSound(theme: SoundTheme = SoundTheme.CRIMSON_CYBER) {
+        if (theme == SoundTheme.MUTE) return
+        val notes = when (theme) {
+            SoundTheme.CRIMSON_CYBER -> listOf(Note(1568.0, 0, 120), Note(1046.5, 60, 220))
+            SoundTheme.NEURAL_PULSE -> listOf(Note(660.0, 0, 300))
+            SoundTheme.HYPER_ASCENT -> listOf(Note(1568.0, 0, 110), Note(1046.5, 60, 200))
+            SoundTheme.MINIMAL_POP -> listOf(Note(1200.0, 0, 80, glideTo = 800.0))
+            SoundTheme.MUTE -> emptyList()
+        }
+        play(notes, volume = 0.16)
+    }
+
+    private data class Note(
+        val freq: Double,
+        val startMs: Int,
+        val lengthMs: Int,
+        val glideTo: Double? = null
+    )
+
+    private fun play(notes: List<Note>, volume: Double) {
+        if (notes.isEmpty()) return
         scope.launch {
             try {
-                when (theme) {
-                    SoundTheme.CRIMSON_CYBER -> playCyberChime()
-                    SoundTheme.NEURAL_PULSE -> playDualPulse()
-                    SoundTheme.HYPER_ASCENT -> playAscentChime()
-                    SoundTheme.MINIMAL_POP -> playPopCue()
-                    SoundTheme.MUTE -> {}
-                }
+                val pcm = render(notes, volume)
+                playPcm(pcm)
             } catch (e: Exception) {
-                // Ignore audio hardware error
+                // Audio hardware busy or unavailable: a missing chime is fine
             }
         }
     }
 
-    private fun playCyberChime() {
-        // High-tech ascending harmonic chime: 880Hz -> 1320Hz -> 1760Hz
-        val sampleRate = 44100
-        val durationMs = 240
-        val numSamples = (sampleRate * durationMs / 1000)
-        val buffer = ShortArray(numSamples)
+    private fun render(notes: List<Note>, volume: Double): ShortArray {
+        val totalMs = notes.maxOf { it.startMs + it.lengthMs } + 20
+        val total = sampleRate * totalMs / 1000
+        val mix = DoubleArray(total)
 
-        val freq1 = 880.0   // A5
-        val freq2 = 1320.0  // E6
-        val freq3 = 1760.0  // A6
-
-        for (i in 0 until numSamples) {
-            val t = i.toDouble() / sampleRate
-            val progress = i.toDouble() / numSamples
-
-            // Frequency envelope: smooth glide upwards
-            val currentFreq = when {
-                progress < 0.3 -> freq1
-                progress < 0.65 -> freq2
-                else -> freq3
+        for (note in notes) {
+            val start = sampleRate * note.startMs / 1000
+            val length = sampleRate * note.lengthMs / 1000
+            val attack = sampleRate * 6 / 1000 // 6 ms fade-in: no click
+            var phase = 0.0
+            for (i in 0 until length) {
+                val idx = start + i
+                if (idx >= total) break
+                val progress = i.toDouble() / length
+                val freq = note.glideTo?.let { note.freq + (it - note.freq) * progress } ?: note.freq
+                phase += 2.0 * PI * freq / sampleRate // running phase: smooth pitch changes
+                val env = min(1.0, i.toDouble() / attack) * exp(-4.5 * progress) * (1.0 - progress)
+                // Sine with a little 2nd harmonic for a soft glassy timbre
+                val sample = (sin(phase) * 0.82 + sin(2.0 * phase) * 0.18) * env
+                mix[idx] += sample
             }
-
-            // Exponential decay envelope
-            val envelope = (1.0 - progress) * (1.0 - progress) * (1.0 + 0.3 * sin(2.0 * Math.PI * 18.0 * t))
-
-            val sample = sin(2.0 * Math.PI * currentFreq * t) * envelope * 0.45
-            buffer[i] = (sample * Short.MAX_VALUE).toInt().toShort()
         }
 
-        playPcm(buffer, sampleRate)
+        val out = ShortArray(total)
+        for (i in 0 until total) {
+            val v = (mix[i] * volume).coerceIn(-1.0, 1.0)
+            out[i] = (v * Short.MAX_VALUE).toInt().toShort()
+        }
+        return out
     }
 
-    private fun playDualPulse() {
-        val sampleRate = 44100
-        val durationMs = 180
-        val numSamples = (sampleRate * durationMs / 1000)
-        val buffer = ShortArray(numSamples)
-
-        val freq1 = 587.33 // D5
-        val freq2 = 880.00 // A5
-
-        for (i in 0 until numSamples) {
-            val t = i.toDouble() / sampleRate
-            val progress = i.toDouble() / numSamples
-            val envelope = sin(Math.PI * progress) * (1.0 - progress * 0.5)
-
-            val sample = (sin(2.0 * Math.PI * freq1 * t) * 0.5 + sin(2.0 * Math.PI * freq2 * t) * 0.5) * envelope * 0.4
-            buffer[i] = (sample * Short.MAX_VALUE).toInt().toShort()
+    private suspend fun playPcm(buffer: ShortArray) {
+        // Stop a sound that is still playing instead of stacking them
+        currentTrack?.let { old ->
+            try { old.stop(); old.release() } catch (e: Exception) {}
         }
 
-        playPcm(buffer, sampleRate)
-    }
-
-    private fun playAscentChime() {
-        val sampleRate = 44100
-        val durationMs = 220
-        val numSamples = (sampleRate * durationMs / 1000)
-        val buffer = ShortArray(numSamples)
-
-        for (i in 0 until numSamples) {
-            val t = i.toDouble() / sampleRate
-            val progress = i.toDouble() / numSamples
-            val freq = 523.25 + (progress * 1046.50) // C5 to C7 sweep
-            val envelope = (1.0 - progress) * 0.4
-
-            val sample = sin(2.0 * Math.PI * freq * t) * envelope
-            buffer[i] = (sample * Short.MAX_VALUE).toInt().toShort()
-        }
-
-        playPcm(buffer, sampleRate)
-    }
-
-    private fun playPopCue() {
-        val sampleRate = 44100
-        val durationMs = 90
-        val numSamples = (sampleRate * durationMs / 1000)
-        val buffer = ShortArray(numSamples)
-
-        for (i in 0 until numSamples) {
-            val t = i.toDouble() / sampleRate
-            val progress = i.toDouble() / numSamples
-            val freq = 1200.0 - (progress * 400.0)
-            val envelope = (1.0 - progress) * (1.0 - progress) * 0.35
-
-            val sample = sin(2.0 * Math.PI * freq * t) * envelope
-            buffer[i] = (sample * Short.MAX_VALUE).toInt().toShort()
-        }
-
-        playPcm(buffer, sampleRate)
-    }
-
-    private fun playPcm(buffer: ShortArray, sampleRate: Int) {
-        val audioTrack = AudioTrack.Builder()
+        val track = AudioTrack.Builder()
             .setAudioAttributes(
                 AudioAttributes.Builder()
                     .setUsage(AudioAttributes.USAGE_ASSISTANCE_SONIFICATION)
@@ -151,16 +135,15 @@ class SoundCueHelper {
             .setTransferMode(AudioTrack.MODE_STATIC)
             .build()
 
-        audioTrack.write(buffer, 0, buffer.size)
-        audioTrack.play()
+        currentTrack = track
+        track.write(buffer, 0, buffer.size)
+        track.play()
 
-        // Release track after playback completes
-        scope.launch {
-            kotlinx.coroutines.delay((buffer.size * 1000L / sampleRate) + 100L)
-            try {
-                audioTrack.stop()
-                audioTrack.release()
-            } catch (e: Exception) {}
-        }
+        delay(buffer.size * 1000L / sampleRate + 80L)
+        if (currentTrack === track) currentTrack = null
+        try {
+            track.stop()
+            track.release()
+        } catch (e: Exception) {}
     }
 }

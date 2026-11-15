@@ -8,6 +8,9 @@ An Android voice assistant powered by Google Gemini. Say **"Hey Tecno"**, ask a 
 Get the latest APK from **[Releases → Latest](https://github.com/Tecnolegend/TecnoAI-Assistant/releases/latest)**, open it on your phone and allow installing from this source. New versions install over the old one and keep your data.
 
 ## Features
+- **Clean chat** — a calm, dark chat screen with formatted answers, copy buttons, new chats and a glowing "thinking" indicator
+- **"Hey Tecno" pop-up** — say the wake word and a glowing panel opens over any app, like Siri and Gemini; the light reacts to your voice
+- **Share your screen** — turn on *Share screen* and ask "what's on my screen?" or "summarize this"; Tecno AI looks at a screenshot of the app you're in (needs the accessibility service, Android 11+)
 - **"Hey Tecno" wake word** — hands-free activation that runs in the background (can be switched off in Settings)
 - **Voice in, voice out** — speech recognition and natural text-to-speech replies
 - **Voice enrollment** — trains on your voice during setup
